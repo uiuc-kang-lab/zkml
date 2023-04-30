@@ -155,7 +155,6 @@ pub fn time_circuit_kzg(circuit: ModelCircuit<Fr>) {
   let strategy = SingleStrategy::new(&params);
   let transcript_read = Blake2bRead::<_, _, Challenge255<_>>::init(&proof[..]);
 
-  println!("public vals: {:?}", public_vals);
   verify_kzg(
     &params,
     &pk.get_vk(),

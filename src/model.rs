@@ -23,9 +23,13 @@ use crate::{
     gadget::{Gadget, GadgetConfig, GadgetType},
     input_lookup::InputLookupChip,
     max::MaxChip,
+    mul_div_clamp::MulDivClampChip,
     mul_pairs::MulPairsChip,
+    nonlinear::{
+      clamp::ClampGadgetChip, logistic::LogisticGadgetChip, rsqrt::RsqrtGadgetChip,
+      sqrt::SqrtGadgetChip,
+    },
     nonlinear::{exp::ExpGadgetChip, pow::PowGadgetChip, relu::ReluChip, tanh::TanhGadgetChip},
-    nonlinear::{logistic::LogisticGadgetChip, rsqrt::RsqrtGadgetChip, sqrt::SqrtGadgetChip},
     sqrt_big::SqrtBigChip,
     square::SquareGadgetChip,
     squared_diff::SquaredDiffGadgetChip,
@@ -42,6 +46,7 @@ use crate::{
     conv2d::Conv2DChip,
     dag::{DAGLayerChip, DAGLayerConfig},
     fully_connected::{FullyConnectedChip, FullyConnectedConfig},
+    gain::GainChip,
     layer::{AssignedTensor, CellRc, GadgetConsumer, Layer, LayerConfig, LayerType},
     logistic::LogisticChip,
     max_pool_2d::MaxPool2DChip,
@@ -268,6 +273,7 @@ impl<F: PrimeField> ModelCircuit<F> {
       "Div" => LayerType::DivFixed, // TODO: rename to DivFixed
       "DivVar" => LayerType::DivVar,
       "FullyConnected" => LayerType::FullyConnected,
+      "Gain" => LayerType::Gain,
       "Logistic" => LayerType::Logistic,
       "MaskNegInf" => LayerType::MaskNegInf,
       "MaxPool2D" => LayerType::MaxPool2D,
@@ -338,6 +344,7 @@ impl<F: PrimeField> ModelCircuit<F> {
               config: FullyConnectedConfig { normalize: true },
               _marker: PhantomData::<F>,
             }) as Box<dyn GadgetConsumer>,
+            LayerType::Gain => Box::new(GainChip {}) as Box<dyn GadgetConsumer>,
             LayerType::Logistic => Box::new(LogisticChip {}) as Box<dyn GadgetConsumer>,
             LayerType::MaskNegInf => Box::new(MaskNegInfChip {}) as Box<dyn GadgetConsumer>,
             LayerType::MaxPool2D => Box::new(MaxPool2DChip {
@@ -563,10 +570,12 @@ impl<F: PrimeField + Ord> Circuit<F> for ModelCircuit<F> {
         GadgetType::Adder => AdderChip::<F>::configure(meta, gadget_config),
         GadgetType::BiasDivRoundRelu6 => BiasDivRoundRelu6Chip::<F>::configure(meta, gadget_config),
         GadgetType::BiasDivFloorRelu6 => panic!(),
+        GadgetType::Clamp => ClampGadgetChip::<F>::configure(meta, gadget_config),
         GadgetType::DotProduct => DotProductChip::<F>::configure(meta, gadget_config),
         GadgetType::Exp => ExpGadgetChip::<F>::configure(meta, gadget_config),
         GadgetType::Logistic => LogisticGadgetChip::<F>::configure(meta, gadget_config),
         GadgetType::Max => MaxChip::<F>::configure(meta, gadget_config),
+        GadgetType::MulDivClamp => MulDivClampChip::<F>::configure(meta, gadget_config),
         GadgetType::MulPairs => MulPairsChip::<F>::configure(meta, gadget_config),
         GadgetType::Pow => PowGadgetChip::<F>::configure(meta, gadget_config),
         GadgetType::Relu => ReluChip::<F>::configure(meta, gadget_config),
@@ -610,6 +619,10 @@ impl<F: PrimeField + Ord> Circuit<F> for ModelCircuit<F> {
         GadgetType::Adder => {
           let chip = AdderChip::<F>::construct(gadget_rc.clone());
           chip.load_lookups(layouter.namespace(|| "adder lookup"))?;
+        }
+        GadgetType::MulDivClamp => {
+          let chip = MulDivClampChip::<F>::construct(gadget_rc.clone());
+          chip.load_lookups(layouter.namespace(|| "mul div clamp lookup"))?;
         }
         GadgetType::BiasDivRoundRelu6 => {
           let chip = BiasDivRoundRelu6Chip::<F>::construct(gadget_rc.clone());

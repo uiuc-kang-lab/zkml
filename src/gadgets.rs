@@ -6,6 +6,7 @@ pub mod dot_prod;
 pub mod gadget;
 pub mod input_lookup;
 pub mod max;
+pub mod mul_div_clamp;
 pub mod mul_pairs;
 pub mod sqrt_big;
 pub mod square;

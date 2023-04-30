@@ -9,6 +9,7 @@ use crate::{
     batch_mat_mul::BatchMatMulChip,
     div_fixed::DivFixedChip,
     fully_connected::{FullyConnectedChip, FullyConnectedConfig},
+    gain::GainChip,
     logistic::LogisticChip,
     max_pool_2d::MaxPool2DChip,
     mean::MeanChip,
@@ -188,6 +189,16 @@ impl<F: PrimeField + Ord> Layer<F> for DAGLayerChip<F> {
           };
           fc_chip.forward(
             layouter.namespace(|| "dag fully connected"),
+            &vec_inps,
+            constants,
+            gadget_config.clone(),
+            &layer_config,
+          )?
+        }
+        LayerType::Gain => {
+          let gain_chip = GainChip {};
+          gain_chip.forward(
+            layouter.namespace(|| "dag gain"),
             &vec_inps,
             constants,
             gadget_config.clone(),
