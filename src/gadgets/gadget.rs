@@ -17,7 +17,6 @@ pub enum GadgetType {
   Adder,
   BiasDivRoundRelu6,
   BiasDivFloorRelu6,
-  Clamp,
   DotProduct,
   Exp,
   Logistic,
