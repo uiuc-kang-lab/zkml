@@ -478,7 +478,7 @@ impl<F: PrimeField + Ord> DAGLayerChip<F> {
 
 impl<F: PrimeField + Ord> GadgetConsumer for DAGLayerChip<F> {
   // Special case: DAG doesn't do anything
-  fn used_gadgets(&self, _layer_params: Vec<i64>) -> Vec<crate::gadgets::gadget::GadgetType> {
+  fn used_gadgets(&self, _layer_config: &LayerConfig) -> Vec<crate::gadgets::gadget::GadgetType> {
     vec![]
   }
 }

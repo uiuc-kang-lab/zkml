@@ -37,7 +37,7 @@ impl<F: PrimeField> Layer<F> for PermuteChip {
 }
 
 impl GadgetConsumer for PermuteChip {
-  fn used_gadgets(&self, _layer_params: Vec<i64>) -> Vec<crate::gadgets::gadget::GadgetType> {
+  fn used_gadgets(&self, _layer_config: &LayerConfig) -> Vec<crate::gadgets::gadget::GadgetType> {
     vec![]
   }
 }

@@ -307,8 +307,8 @@ impl<F: PrimeField> Layer<F> for FullyConnectedChip<F> {
 }
 
 impl<F: PrimeField> GadgetConsumer for FullyConnectedChip<F> {
-  fn used_gadgets(&self, layer_params: Vec<i64>) -> Vec<crate::gadgets::gadget::GadgetType> {
-    let activation = self.get_activation(&layer_params);
+  fn used_gadgets(&self, layer_config: &LayerConfig) -> Vec<crate::gadgets::gadget::GadgetType> {
+    let activation = self.get_activation(&layer_config.layer_params);
     let mut outp = vec![
       GadgetType::Adder,
       GadgetType::AddPairs,

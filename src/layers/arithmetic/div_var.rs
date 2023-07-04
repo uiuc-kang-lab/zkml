@@ -13,7 +13,7 @@ use crate::{
     mul_pairs::MulPairsChip,
     var_div::VarDivRoundChip,
   },
-  layers::layer::{AssignedTensor, CellRc, GadgetConsumer, Layer},
+  layers::layer::{AssignedTensor, CellRc, GadgetConsumer, Layer, LayerConfig},
 };
 
 use super::Arithmetic;
@@ -83,7 +83,7 @@ impl<F: PrimeField> Layer<F> for DivVarChip {
 }
 
 impl GadgetConsumer for DivVarChip {
-  fn used_gadgets(&self, _layer_params: Vec<i64>) -> Vec<crate::gadgets::gadget::GadgetType> {
+  fn used_gadgets(&self, _layer_config: &LayerConfig) -> Vec<crate::gadgets::gadget::GadgetType> {
     vec![
       GadgetType::MulPairs,
       GadgetType::VarDivRound,

@@ -18,6 +18,7 @@ pub struct LayerMsgpack {
   pub out_idxes: Vec<i64>,
   pub out_shapes: Vec<Vec<i64>>,
   pub mask: Vec<i64>,
+  pub implementation: Option<i64>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]

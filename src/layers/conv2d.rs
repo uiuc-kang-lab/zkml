@@ -434,8 +434,8 @@ impl<F: PrimeField> Layer<F> for Conv2DChip<F> {
 }
 
 impl<F: PrimeField> GadgetConsumer for Conv2DChip<F> {
-  fn used_gadgets(&self, layer_params: Vec<i64>) -> Vec<crate::gadgets::gadget::GadgetType> {
-    let conv_config = &Self::param_vec_to_config(layer_params.clone());
+  fn used_gadgets(&self, layer_config: &LayerConfig) -> Vec<crate::gadgets::gadget::GadgetType> {
+    let conv_config = &Self::param_vec_to_config(layer_config.layer_params.clone());
     let mut outp = vec![
       GadgetType::Adder,
       GadgetType::DotProduct,
