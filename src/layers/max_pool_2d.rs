@@ -118,7 +118,7 @@ impl<F: PrimeField> Layer<F> for MaxPool2DChip<F> {
 }
 
 impl<F: PrimeField> GadgetConsumer for MaxPool2DChip<F> {
-  fn used_gadgets(&self, _layer_params: Vec<i64>) -> Vec<GadgetType> {
+  fn used_gadgets(&self, _layer_config: &LayerConfig) -> Vec<GadgetType> {
     vec![GadgetType::Max, GadgetType::InputLookup]
   }
 }

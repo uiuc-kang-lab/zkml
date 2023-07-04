@@ -67,7 +67,7 @@ impl<F: PrimeField> Layer<F> for SquaredDiffChip {
 }
 
 impl GadgetConsumer for SquaredDiffChip {
-  fn used_gadgets(&self, _layer_params: Vec<i64>) -> Vec<crate::gadgets::gadget::GadgetType> {
+  fn used_gadgets(&self, _layer_config: &LayerConfig) -> Vec<crate::gadgets::gadget::GadgetType> {
     vec![
       GadgetType::SquaredDiff,
       GadgetType::VarDivRound,

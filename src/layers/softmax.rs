@@ -199,7 +199,7 @@ impl<F: PrimeField> Layer<F> for SoftmaxChip {
 }
 
 impl GadgetConsumer for SoftmaxChip {
-  fn used_gadgets(&self, _layer_params: Vec<i64>) -> Vec<crate::gadgets::gadget::GadgetType> {
+  fn used_gadgets(&self, _layer_config: &LayerConfig) -> Vec<crate::gadgets::gadget::GadgetType> {
     vec![
       GadgetType::Exp,
       GadgetType::Adder,

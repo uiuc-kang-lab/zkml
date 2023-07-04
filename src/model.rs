@@ -364,6 +364,13 @@ impl<F: PrimeField + Ord + FromUniformBytes<64>> ModelCircuit<F> {
         .iter()
         .map(|layer| {
           let layer_type = match_layer(&layer.layer_type);
+          let layer_config = LayerConfig {
+            layer_type,
+            layer_params: layer.params.clone(),
+            inp_shapes: layer.inp_shapes.iter().map(|x| i64_to_usize(x)).collect(),
+            out_shapes: layer.out_shapes.iter().map(|x| i64_to_usize(x)).collect(),
+            mask: layer.mask.clone(),
+          };
           let layer_gadgets = match layer_type {
             LayerType::Add => Box::new(AddChip {}) as Box<dyn GadgetConsumer>,
             LayerType::AvgPool2D => Box::new(AvgPool2DChip {}) as Box<dyn GadgetConsumer>,
@@ -407,18 +414,12 @@ impl<F: PrimeField + Ord + FromUniformBytes<64>> ModelCircuit<F> {
             LayerType::Transpose => Box::new(TransposeChip {}) as Box<dyn GadgetConsumer>,
             LayerType::Update => Box::new(UpdateChip {}) as Box<dyn GadgetConsumer>,
           }
-          .used_gadgets(layer.params.clone());
+          .used_gadgets(&layer_config);
           for gadget in layer_gadgets {
             used_gadgets.insert(gadget);
           }
 
-          LayerConfig {
-            layer_type,
-            layer_params: layer.params.clone(),
-            inp_shapes: layer.inp_shapes.iter().map(|x| i64_to_usize(x)).collect(),
-            out_shapes: layer.out_shapes.iter().map(|x| i64_to_usize(x)).collect(),
-            mask: layer.mask.clone(),
-          }
+          layer_config
         })
         .collect::<Vec<_>>();
       let inp_idxes = config

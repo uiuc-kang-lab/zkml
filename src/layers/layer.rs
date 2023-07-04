@@ -85,5 +85,5 @@ pub trait Layer<F: PrimeField> {
 }
 
 pub trait GadgetConsumer {
-  fn used_gadgets(&self, layer_params: Vec<i64>) -> Vec<GadgetType>;
+  fn used_gadgets(&self, layer_config: &LayerConfig) -> Vec<GadgetType>;
 }

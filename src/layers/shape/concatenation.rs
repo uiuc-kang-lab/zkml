@@ -31,7 +31,7 @@ impl<F: PrimeField> Layer<F> for ConcatenationChip {
 }
 
 impl GadgetConsumer for ConcatenationChip {
-  fn used_gadgets(&self, _layer_params: Vec<i64>) -> Vec<GadgetType> {
+  fn used_gadgets(&self, _layer_config: &LayerConfig) -> Vec<GadgetType> {
     vec![]
   }
 }
