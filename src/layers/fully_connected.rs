@@ -304,6 +304,64 @@ impl<F: PrimeField> Layer<F> for FullyConnectedChip<F> {
 
     Ok(vec![final_result])
   }
+
+  fn num_rows(&self, layer_config: &LayerConfig, num_cols: i64) -> i64 {
+    // Assign the result
+    let out_shape = &layer_config.out_shapes[0];
+    assert_eq!(out_shape.len(), 2);
+    let out_size = out_shape.iter().product::<usize>() as i64;
+    let mut num_rows = out_size.div_ceil(num_cols);
+
+    // r1 * result
+    num_rows +=
+      <FullyConnectedChip<F> as Layer<F>>::num_rows_dot_acc(out_shape[0] as i64, num_cols)
+        * (out_shape[1] as i64);
+    // r1 * result * r2
+    num_rows +=
+      <FullyConnectedChip<F> as Layer<F>>::num_rows_dot_acc(out_shape[1] as i64, num_cols);
+
+    // r1 * input
+    let inp_shape = &layer_config.inp_shapes[0];
+    let inp_shape = if inp_shape.len() == 2 {
+      inp_shape
+    } else {
+      &inp_shape[1..]
+    };
+    num_rows +=
+      <FullyConnectedChip<F> as Layer<F>>::num_rows_dot_acc(inp_shape[0] as i64, num_cols)
+        * (inp_shape[1] as i64);
+
+    let weight_shape = &layer_config.inp_shapes[1];
+    num_rows +=
+      <FullyConnectedChip<F> as Layer<F>>::num_rows_dot_acc(weight_shape[0] as i64, num_cols)
+        * (weight_shape[1] as i64);
+
+    // (r1 * input) * (weight * r2)
+    num_rows +=
+      <FullyConnectedChip<F> as Layer<F>>::num_rows_dot_acc(inp_shape[1] as i64, num_cols);
+
+    // Normalization
+    if self.config.normalize {
+      let num_divs_per_row = (num_cols - 1) / 3;
+      let num_rows_for_div = out_size.div_ceil(num_divs_per_row);
+      num_rows += num_rows_for_div;
+
+      if layer_config.inp_shapes.len() == 3 {
+        let num_adds_per_row = num_cols / 2;
+        let num_rows_for_add = out_size.div_ceil(num_adds_per_row);
+        num_rows += num_rows_for_add;
+      }
+
+      let activation = self.get_activation(&layer_config.layer_params);
+      if activation == ActivationType::Relu {
+        let num_relus_per_row = num_cols / 2;
+        let num_rows_for_relu = out_size.div_ceil(num_relus_per_row);
+        num_rows += num_rows_for_relu;
+      }
+    }
+
+    num_rows
+  }
 }
 
 impl<F: PrimeField> GadgetConsumer for FullyConnectedChip<F> {
@@ -311,11 +369,13 @@ impl<F: PrimeField> GadgetConsumer for FullyConnectedChip<F> {
     let activation = self.get_activation(&layer_config.layer_params);
     let mut outp = vec![
       GadgetType::Adder,
-      GadgetType::AddPairs,
       GadgetType::DotProduct,
       GadgetType::VarDivRound,
       GadgetType::InputLookup,
     ];
+    if layer_config.inp_shapes.len() >= 3 {
+      outp.push(GadgetType::AddPairs);
+    }
     match activation {
       ActivationType::Relu => outp.push(GadgetType::Relu),
       ActivationType::None => (),

@@ -431,6 +431,56 @@ impl<F: PrimeField> Layer<F> for Conv2DChip<F> {
 
     Ok(vec![outp])
   }
+
+  fn num_rows(&self, layer_config: &LayerConfig, num_cols: i64) -> i64 {
+    let conv_config = &Self::param_vec_to_config(layer_config.layer_params.clone());
+    let inp_shape = layer_config.inp_shapes[0].clone();
+    let weight_shape = layer_config.inp_shapes[1].clone();
+
+    let (oh, ow) = Self::out_hw(
+      inp_shape[1],
+      inp_shape[2],
+      conv_config.stride.0,
+      conv_config.stride.1,
+      weight_shape[1],
+      weight_shape[2],
+      conv_config.padding,
+    );
+    let batch_size = inp_shape[0] as i64;
+
+    let mut num_rows = match conv_config.conv_type {
+      ConvLayerEnum::Conv2D => {
+        let conv_size = weight_shape[1] * weight_shape[2] * weight_shape[3];
+        let tmp_config = LayerConfig {
+          layer_params: vec![0],
+          inp_shapes: vec![
+            vec![weight_shape[0], conv_size],
+            vec![batch_size as usize * oh * ow, conv_size],
+          ],
+          ..layer_config.clone()
+        };
+        let fc_chip = FullyConnectedChip::<F> {
+          _marker: PhantomData,
+          config: FullyConnectedConfig::construct(true),
+        };
+        fc_chip.num_rows(&tmp_config, num_cols)
+      }
+      ConvLayerEnum::DepthwiseConv2D => {
+        let num_dots = (oh * ow * weight_shape[3]) as i64;
+        let dot_size = (weight_shape[1] * weight_shape[2]) as i64;
+        let num_rows_for_dot =
+          <Conv2DChip<F> as Layer<F>>::num_rows_dot_acc(dot_size as i64, num_cols);
+        num_dots * num_rows_for_dot * batch_size
+      }
+    };
+
+    // This implementation always does the bias + div + relu
+    let num_bdr_per_row = num_cols / 5;
+    let num_bdr_rows = num_rows.div_ceil(num_bdr_per_row);
+    num_rows += num_bdr_rows;
+
+    num_rows
+  }
 }
 
 impl<F: PrimeField> GadgetConsumer for Conv2DChip<F> {

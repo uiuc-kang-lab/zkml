@@ -42,6 +42,10 @@ impl<F: PrimeField + Ord> Layer<F> for UpdateChip {
 
     Ok(vec![out])
   }
+
+  fn num_rows(&self, _layer_config: &LayerConfig, _num_cols: i64) -> i64 {
+    panic!("Not implemented")
+  }
 }
 
 impl GadgetConsumer for UpdateChip {

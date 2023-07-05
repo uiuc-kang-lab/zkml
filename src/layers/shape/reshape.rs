@@ -29,6 +29,10 @@ impl<F: PrimeField> Layer<F> for ReshapeChip {
     let out = Array::from_shape_vec(shape, flat).unwrap();
     Ok(vec![out])
   }
+
+  fn num_rows(&self, _layer_config: &LayerConfig, _num_cols: i64) -> i64 {
+    0
+  }
 }
 
 impl GadgetConsumer for ReshapeChip {

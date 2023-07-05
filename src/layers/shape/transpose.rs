@@ -43,6 +43,10 @@ impl<F: PrimeField> Layer<F> for TransposeChip {
 
     Ok(vec![inp])
   }
+
+  fn num_rows(&self, _layer_config: &LayerConfig, _num_cols: i64) -> i64 {
+    0
+  }
 }
 
 impl GadgetConsumer for TransposeChip {
