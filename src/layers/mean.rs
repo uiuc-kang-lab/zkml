@@ -126,6 +126,15 @@ impl<F: PrimeField> Layer<F> for MeanChip {
     let out = Array::from_shape_vec(IxDyn(&out_shape), dived).unwrap();
     Ok(vec![out])
   }
+
+  fn num_rows(&self, layer_config: &LayerConfig, num_cols: i64) -> i64 {
+    let keep_axis = self.get_keep_axis(layer_config);
+    let inp_size: usize = layer_config.inp_shapes[0].iter().product();
+    let num_inps_per_sum = inp_size / layer_config.inp_shapes[0][keep_axis];
+    let num_sums = layer_config.inp_shapes[0][keep_axis];
+
+    Averager::<F>::get_num_rows(self, num_sums as i64, num_inps_per_sum as i64, num_cols)
+  }
 }
 
 impl GadgetConsumer for MeanChip {

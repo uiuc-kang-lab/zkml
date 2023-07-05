@@ -89,6 +89,26 @@ impl<F: PrimeField> Layer<F> for AddChip {
 
     Ok(vec![out])
   }
+
+  fn num_rows(&self, layer_config: &LayerConfig, num_cols: i64) -> i64 {
+    let inp_size = <AddChip as Arithmetic<F>>::get_inp_size(layer_config);
+
+    // TODO: times two? check add_pairs...
+    let num_add_per_row = num_cols / 3;
+    let mut num_rows = (inp_size as i64).div_ceil(num_add_per_row);
+
+    let activation = self.get_activation(&layer_config.layer_params);
+    match activation {
+      ActivationType::Relu => {
+        let num_relu_per_row = num_cols / 2;
+        num_rows += (inp_size as i64).div_ceil(num_relu_per_row);
+      }
+      ActivationType::None => (),
+      _ => panic!("Unsupported activation type for add"),
+    }
+
+    num_rows
+  }
 }
 
 impl GadgetConsumer for AddChip {

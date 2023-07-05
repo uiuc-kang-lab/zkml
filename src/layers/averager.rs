@@ -9,7 +9,10 @@ use halo2_proofs::{
 use crate::gadgets::gadget::Gadget;
 use crate::gadgets::{adder::AdderChip, gadget::GadgetConfig, var_div::VarDivRoundChip};
 
-use super::layer::{AssignedTensor, CellRc, LayerConfig};
+use super::{
+  arithmetic::add::AddChip,
+  layer::{AssignedTensor, CellRc, Layer, LayerConfig},
+};
 
 pub trait Averager<F: PrimeField> {
   fn splat(&self, input: &AssignedTensor<F>, layer_config: &LayerConfig) -> Vec<Vec<CellRc<F>>>;
@@ -21,6 +24,20 @@ pub trait Averager<F: PrimeField> {
     gadget_config: Rc<GadgetConfig>,
     layer_config: &LayerConfig,
   ) -> Result<AssignedCell<F, F>, Error>;
+
+  fn get_num_rows(&self, num_sums: i64, num_inps_per_sum: i64, num_cols: i64) -> i64 {
+    // Number of rows from the sum
+    let num_adds_per_row = num_cols - 1;
+    let num_rows_per_sum =
+      <AddChip as Layer<F>>::num_rows_reduction(num_inps_per_sum, num_adds_per_row);
+    let mut num_rows = num_sums * num_rows_per_sum;
+
+    // Number of rows from the division
+    let num_divs_per_row = (num_cols - 1) / 3;
+    num_rows += num_sums.div_ceil(num_divs_per_row);
+
+    num_rows
+  }
 
   fn avg_forward(
     &self,

@@ -196,6 +196,39 @@ impl<F: PrimeField> Layer<F> for SoftmaxChip {
     let outp = Array::from_shape_vec(IxDyn(inp.shape()), outp).unwrap();
     Ok(vec![outp])
   }
+
+  fn num_rows(&self, layer_config: &LayerConfig, num_cols: i64) -> i64 {
+    let softmax_flat_rows = |num_el: i64| {
+      let num_max_per_row = num_cols / 3;
+      let num_max_rows = <SoftmaxChip as Layer<F>>::num_rows_reduction(num_el, num_max_per_row);
+
+      let num_sub_per_row = num_cols / 2;
+      let num_sub_rows = num_el.div_ceil(num_sub_per_row);
+
+      let num_exp_per_row = num_cols / 2;
+      let num_exp_rows = num_el.div_ceil(num_exp_per_row);
+
+      let num_add_per_row = num_cols - 1;
+      let num_add_rows = <SoftmaxChip as Layer<F>>::num_rows_reduction(num_el, num_add_per_row);
+
+      let num_div_per_row = (num_cols - 1) / 9;
+      let num_div_rows = num_el.div_ceil(num_div_per_row);
+
+      // +1 because of the division of the sum by the scale factor
+      num_max_rows + num_sub_rows + num_exp_rows + num_add_rows + num_div_rows + 1
+    };
+
+    let inp_shape = &layer_config.inp_shapes[0];
+    let num_rows = if inp_shape.len() == 2 {
+      inp_shape[0] as i64 * softmax_flat_rows(inp_shape[1] as i64)
+    } else if inp_shape.len() == 3 {
+      inp_shape[0] as i64 * inp_shape[1] as i64 * softmax_flat_rows(inp_shape[2] as i64)
+    } else {
+      panic!("Not implemented");
+    };
+
+    num_rows
+  }
 }
 
 impl GadgetConsumer for SoftmaxChip {

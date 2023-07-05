@@ -20,6 +20,10 @@ impl<F: PrimeField> Layer<F> for NoopChip {
     let ret_idx = layer_config.layer_params[0] as usize;
     Ok(vec![tensors[ret_idx].clone()])
   }
+
+  fn num_rows(&self, _layer_config: &LayerConfig, _num_cols: i64) -> i64 {
+    0
+  }
 }
 
 impl GadgetConsumer for NoopChip {

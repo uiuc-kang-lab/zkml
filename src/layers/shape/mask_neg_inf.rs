@@ -46,6 +46,10 @@ impl<F: PrimeField> Layer<F> for MaskNegInfChip {
     let outp = Array::from_shape_vec(inp.raw_dim(), out_vec).unwrap();
     Ok(vec![outp])
   }
+
+  fn num_rows(&self, _layer_config: &LayerConfig, _num_cols: i64) -> i64 {
+    0
+  }
 }
 
 impl GadgetConsumer for MaskNegInfChip {
