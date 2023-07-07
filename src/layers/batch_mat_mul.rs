@@ -5,13 +5,10 @@ use ndarray::{Array, Axis, IxDyn};
 
 use crate::{
   gadgets::gadget::{GadgetConfig, GadgetType},
-  layers::fully_connected::FullyConnectedConfig,
+  layers::fc::fully_connected::{FullyConnectedChip, FullyConnectedConfig},
 };
 
-use super::{
-  fully_connected::FullyConnectedChip,
-  layer::{AssignedTensor, CellRc, GadgetConsumer, Layer, LayerConfig},
-};
+use super::layer::{AssignedTensor, CellRc, GadgetConsumer, Layer, LayerConfig};
 
 pub struct BatchMatMulChip {}
 

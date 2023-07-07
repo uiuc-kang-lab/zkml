@@ -17,7 +17,7 @@ use crate::{
     nonlinear::relu::ReluChip,
   },
   layers::{
-    fully_connected::{FullyConnectedChip, FullyConnectedConfig},
+    fc::fully_connected::{FullyConnectedChip, FullyConnectedConfig},
     shape::pad::pad,
   },
 };

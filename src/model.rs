@@ -46,7 +46,7 @@ use crate::{
     batch_mat_mul::BatchMatMulChip,
     conv2d::Conv2DChip,
     dag::{DAGLayerChip, DAGLayerConfig},
-    fully_connected::{FullyConnectedChip, FullyConnectedConfig},
+    fc::fully_connected::{FullyConnectedChip, FullyConnectedConfig},
     layer::{AssignedTensor, CellRc, GadgetConsumer, LayerConfig, LayerType},
     logistic::LogisticChip,
     max_pool_2d::MaxPool2DChip,
@@ -346,12 +346,14 @@ impl<F: PrimeField + Ord + FromUniformBytes<64>> ModelCircuit<F> {
       if panic_empty_tensor && num_el != value_flat.len() {
         panic!("tensor shape and data length mismatch");
       }
-      if num_el == value_flat.len() {
-        let tensor = Array::from_shape_vec(IxDyn(&shape), value_flat).unwrap();
-        tensors.insert(flat.idx, tensor);
+      let tensor = if num_el == value_flat.len() {
+        Array::from_shape_vec(IxDyn(&shape), value_flat).unwrap()
       } else {
-        // Do nothing here since we're loading the config
+        // Fill with zeros
+        Array::from_shape_vec(IxDyn(&shape), vec![F::ZERO; num_el]).unwrap()
       };
+
+      tensors.insert(flat.idx, tensor);
     }
 
     let i64_to_usize = |x: &Vec<i64>| x.iter().map(|x| *x as usize).collect::<Vec<_>>();

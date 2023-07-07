@@ -8,7 +8,7 @@ use crate::{
     arithmetic::{add::AddChip, div_var::DivVarChip, mul::MulChip, sub::SubChip},
     batch_mat_mul::BatchMatMulChip,
     div_fixed::DivFixedChip,
-    fully_connected::{FullyConnectedChip, FullyConnectedConfig},
+    fc::fully_connected::{FullyConnectedChip, FullyConnectedConfig},
     logistic::LogisticChip,
     max_pool_2d::MaxPool2DChip,
     mean::MeanChip,

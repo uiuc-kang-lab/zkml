@@ -19,7 +19,7 @@ use crate::{
   utils::helpers::RAND_START_IDX,
 };
 
-use super::layer::{AssignedTensor, CellRc, GadgetConsumer, Layer, LayerConfig};
+use super::super::layer::{AssignedTensor, CellRc, GadgetConsumer, Layer, LayerConfig};
 
 pub struct FullyConnectedConfig {
   pub normalize: bool, // Should be true
