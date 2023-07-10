@@ -13,6 +13,7 @@ use crate::{
 
 use super::{
   super::layer::{AssignedTensor, CellRc, GadgetConsumer, Layer, LayerConfig},
+  fc_dp_vdiv_lookup::FCDPVarDivLookupChip,
   fc_rlc_vdiv_lookup::FCRLCVarDivLookupChip,
 };
 
@@ -115,10 +116,18 @@ impl<F: PrimeField> Layer<F> for FullyConnectedChip<F> {
     layer_config: &LayerConfig,
   ) -> Result<Vec<AssignedTensor<F>>, Error> {
     assert!(tensors.len() <= 3);
+
     let implementation = layer_config.implementation_idx;
     match implementation {
       0 => {
         let chip = FCRLCVarDivLookupChip::<F> {
+          config: self.config.clone(),
+          _marker: PhantomData,
+        };
+        chip.forward(layouter, tensors, constants, gadget_config, layer_config)
+      }
+      1 => {
+        let chip = FCDPVarDivLookupChip::<F> {
           config: self.config.clone(),
           _marker: PhantomData,
         };
@@ -138,6 +147,13 @@ impl<F: PrimeField> Layer<F> for FullyConnectedChip<F> {
         };
         chip.num_rows(layer_config, num_cols)
       }
+      1 => {
+        let chip = FCDPVarDivLookupChip::<F> {
+          config: self.config.clone(),
+          _marker: PhantomData,
+        };
+        chip.num_rows(layer_config, num_cols)
+      }
       _ => panic!("Unsupported implementation"),
     }
   }
@@ -150,6 +166,13 @@ impl<F: PrimeField> GadgetConsumer for FullyConnectedChip<F> {
     match implementation {
       0 => {
         let chip = FCRLCVarDivLookupChip::<F> {
+          config: self.config.clone(),
+          _marker: PhantomData,
+        };
+        chip.used_gadgets(layer_config)
+      }
+      1 => {
+        let chip = FCDPVarDivLookupChip::<F> {
           config: self.config.clone(),
           _marker: PhantomData,
         };
