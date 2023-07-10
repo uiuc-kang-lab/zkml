@@ -34,7 +34,6 @@ impl<F: PrimeField> Layer<F> for FCRLCVarDivLookupChip<F> {
     gadget_config: Rc<GadgetConfig>,
     layer_config: &LayerConfig,
   ) -> Result<Vec<AssignedTensor<F>>, Error> {
-    assert!(tensors.len() <= 3);
     let activation = FullyConnectedChip::<F>::get_activation(&layer_config.layer_params);
 
     let input = &tensors[0];
