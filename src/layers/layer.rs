@@ -107,6 +107,11 @@ pub trait Layer<F: PrimeField> {
 
     num_rows_for_dot + num_rows_for_acc
   }
+
+  fn num_rows_dot_bias(len: i64, num_cols: i64) -> i64 {
+    let inps_per_row = (num_cols - 2) / 2;
+    len.div_ceil(inps_per_row)
+  }
 }
 
 pub trait GadgetConsumer {

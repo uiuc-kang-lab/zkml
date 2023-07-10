@@ -3,6 +3,7 @@ pub mod adder;
 pub mod bias_div_floor_relu6;
 pub mod bias_div_round_relu6;
 pub mod dot_prod;
+pub mod dot_prod_bias;
 pub mod gadget;
 pub mod input_lookup;
 pub mod max;
