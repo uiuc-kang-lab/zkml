@@ -18,6 +18,7 @@ Cargo.lock
 # Proof stuff
 out.msgpack
 proof_size_check
+public_vals
 pkey
 vkey
 proof
