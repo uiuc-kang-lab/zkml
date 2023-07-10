@@ -25,6 +25,7 @@ use crate::{
     adder::AdderChip,
     bias_div_round_relu6::BiasDivRoundRelu6Chip,
     dot_prod::DotProductChip,
+    dot_prod_bias::DotProductBiasChip,
     gadget::{Gadget, GadgetConfig, GadgetType},
     input_lookup::InputLookupChip,
     max::MaxChip,
@@ -596,6 +597,7 @@ impl<F: PrimeField + Ord + FromUniformBytes<64>> Circuit<F> for ModelCircuit<F> 
         GadgetType::BiasDivRoundRelu6 => BiasDivRoundRelu6Chip::<F>::configure(meta, gadget_config),
         GadgetType::BiasDivFloorRelu6 => panic!(),
         GadgetType::DotProduct => DotProductChip::<F>::configure(meta, gadget_config),
+        GadgetType::DotProductBias => DotProductBiasChip::<F>::configure(meta, gadget_config),
         GadgetType::Exp => ExpGadgetChip::<F>::configure(meta, gadget_config),
         GadgetType::Logistic => LogisticGadgetChip::<F>::configure(meta, gadget_config),
         GadgetType::Max => MaxChip::<F>::configure(meta, gadget_config),
@@ -665,6 +667,10 @@ impl<F: PrimeField + Ord + FromUniformBytes<64>> Circuit<F> for ModelCircuit<F> 
         GadgetType::DotProduct => {
           let chip = DotProductChip::<F>::construct(gadget_rc.clone());
           chip.load_lookups(layouter.namespace(|| "dot product lookup"))?;
+        }
+        GadgetType::DotProductBias => {
+          let chip = DotProductBiasChip::<F>::construct(gadget_rc.clone());
+          chip.load_lookups(layouter.namespace(|| "dot product bias lookup"))?;
         }
         GadgetType::VarDivRound => {
           let chip = VarDivRoundChip::<F>::construct(gadget_rc.clone());

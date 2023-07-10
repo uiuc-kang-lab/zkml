@@ -8,7 +8,9 @@ use halo2_proofs::{
 use ndarray::{Array, ArrayView, IxDyn};
 
 use crate::{
-  gadgets::gadget::GadgetConfig, layers::layer::ActivationType, utils::helpers::RAND_START_IDX,
+  gadgets::gadget::GadgetConfig,
+  layers::{fc::fc_dpb_vdiv_lookup::FCDPBiasVarDivLookupChip, layer::ActivationType},
+  utils::helpers::RAND_START_IDX,
 };
 
 use super::{
@@ -133,6 +135,13 @@ impl<F: PrimeField> Layer<F> for FullyConnectedChip<F> {
         };
         chip.forward(layouter, tensors, constants, gadget_config, layer_config)
       }
+      2 => {
+        let chip = FCDPBiasVarDivLookupChip::<F> {
+          config: self.config.clone(),
+          _marker: PhantomData,
+        };
+        chip.forward(layouter, tensors, constants, gadget_config, layer_config)
+      }
       _ => panic!("Unsupported implementation"),
     }
   }
@@ -149,6 +158,13 @@ impl<F: PrimeField> Layer<F> for FullyConnectedChip<F> {
       }
       1 => {
         let chip = FCDPVarDivLookupChip::<F> {
+          config: self.config.clone(),
+          _marker: PhantomData,
+        };
+        chip.num_rows(layer_config, num_cols)
+      }
+      2 => {
+        let chip = FCDPBiasVarDivLookupChip::<F> {
           config: self.config.clone(),
           _marker: PhantomData,
         };
@@ -173,6 +189,13 @@ impl<F: PrimeField> GadgetConsumer for FullyConnectedChip<F> {
       }
       1 => {
         let chip = FCDPVarDivLookupChip::<F> {
+          config: self.config.clone(),
+          _marker: PhantomData,
+        };
+        chip.used_gadgets(layer_config)
+      }
+      2 => {
+        let chip = FCDPBiasVarDivLookupChip::<F> {
           config: self.config.clone(),
           _marker: PhantomData,
         };
