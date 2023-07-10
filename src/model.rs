@@ -372,6 +372,7 @@ impl<F: PrimeField + Ord + FromUniformBytes<64>> ModelCircuit<F> {
             inp_shapes: layer.inp_shapes.iter().map(|x| i64_to_usize(x)).collect(),
             out_shapes: layer.out_shapes.iter().map(|x| i64_to_usize(x)).collect(),
             mask: layer.mask.clone(),
+            implementation_idx: layer.implementation.unwrap_or(0),
           };
           let layer_gadgets = match layer_type {
             LayerType::Add => Box::new(AddChip {}) as Box<dyn GadgetConsumer>,

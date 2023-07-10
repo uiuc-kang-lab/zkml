@@ -67,6 +67,7 @@ pub struct LayerConfig {
   pub inp_shapes: Vec<Vec<usize>>,
   pub out_shapes: Vec<Vec<usize>>,
   pub mask: Vec<i64>,
+  pub implementation_idx: i64,
 }
 
 pub type CellRc<F> = Rc<AssignedCell<F, F>>;
