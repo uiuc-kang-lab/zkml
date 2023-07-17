@@ -173,6 +173,7 @@ pub fn time_circuit_kzg(circuit: ModelCircuit<Fr>) {
 
   let mut transcript = Blake2bWrite::<_, G1Affine, Challenge255<_>>::init(vec![]);
   create_proof::<
+    Bn256,
     KZGCommitmentScheme<Bn256>,
     ProverSHPLONK<'_, Bn256>,
     Challenge255<G1Affine>,
@@ -181,6 +182,7 @@ pub fn time_circuit_kzg(circuit: ModelCircuit<Fr>) {
     ModelCircuit<Fr>,
   >(
     &params,
+    &cqlin_params,
     &pk,
     &[proof_circuit],
     &[&[&public_vals]],
@@ -198,13 +200,25 @@ pub fn time_circuit_kzg(circuit: ModelCircuit<Fr>) {
   println!("Proof size: {} bytes", proof_size);
 
   let strategy = SingleStrategy::new(&params);
+  let mut small_strategies = HashMap::new();
+  for (length, param) in cqlin_params.iter(){ 
+    small_strategies.insert(*length, SingleStrategy::new(&params));
+  }
+
+  let cqlin_params_rf: HashMap<_, _> = cqlin_params
+    .iter()
+    .map(|(&len, params)| (len, params))
+    .collect();
+
   let transcript_read = Blake2bRead::<_, _, Challenge255<_>>::init(&proof[..]);
 
   println!("public vals: {:?}", public_vals);
   verify_kzg(
     &params,
+    &cqlin_params_rf,
     &pk.get_vk(),
     strategy,
+    small_strategies,
     &public_vals,
     transcript_read,
   );
@@ -219,14 +233,19 @@ pub fn verify_circuit_kzg(
   proof_fname: &str,
   public_vals_fname: &str,
 ) {
+  // ZKML TODO
   let degree = circuit.k as u32;
-  let params = get_kzg_params("./params_kzg", degree);
+  let cqlin_degree = circuit.k as u32;
+  let cq_degree = circuit.k as u32;
+
+  let params = get_kzg_params("./params_kzg", degree, cqlin_degree, cq_degree);
+  let cqlin_params = get_cqlin_kzg_params(&params, "./cqlin_params_kzg", vec![]);
+
   println!("Loaded the parameters");
 
   let vk = VerifyingKey::read::<BufReader<File>, ModelCircuit<Fr>>(
     &mut BufReader::new(File::open(vkey_fname).unwrap()),
-    SerdeFormat::RawBytes,
-    (),
+    SerdeFormat::RawBytes
   )
   .unwrap();
   println!("Loaded vkey");
@@ -240,11 +259,21 @@ pub fn verify_circuit_kzg(
     .collect();
 
   let strategy = SingleStrategy::new(&params);
+  let mut small_strategies = HashMap::new();
+  for (length, param) in cqlin_params.iter(){ 
+    small_strategies.insert(*length, SingleStrategy::new(&params));
+  }
+
+  let cqlin_params_rf: HashMap<_, _> = cqlin_params
+    .iter()
+    .map(|(&len, params)| (len, params))
+    .collect();
+
   let transcript = Blake2bRead::<_, _, Challenge255<_>>::init(&proof[..]);
 
   let start = Instant::now();
   let verify_start = start.elapsed();
-  verify_kzg(&params, &vk, strategy, &public_vals, transcript);
+  verify_kzg(&params, &cqlin_params_rf, &vk, strategy, small_strategies, &public_vals, transcript);
   let verify_duration = start.elapsed();
   println!("Verifying time: {:?}", verify_duration - verify_start);
   println!("Proof verified!")
