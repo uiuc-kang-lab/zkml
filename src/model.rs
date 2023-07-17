@@ -564,7 +564,6 @@ impl<F: PrimeField + Ord + FromUniformBytes<64>> ModelCircuit<F> {
 impl<F: PrimeField + Ord + FromUniformBytes<64>> Circuit<F> for ModelCircuit<F> {
   type Config = ModelConfig<F>;
   type FloorPlanner = SimpleFloorPlanner;
-  type Params = ();
 
   fn without_witnesses(&self) -> Self {
     todo!()

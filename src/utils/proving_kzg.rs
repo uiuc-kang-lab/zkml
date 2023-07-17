@@ -2,13 +2,13 @@ use std::{
   fs::File,
   io::{BufReader, Write},
   path::Path,
-  time::Instant,
+  time::Instant, collections::HashMap,
 };
 
 use halo2_proofs::{
   dev::MockProver,
   halo2curves::bn256::{Bn256, Fr, G1Affine},
-  plonk::{create_proof, keygen_pk, keygen_vk, verify_proof, VerifyingKey},
+  plonk::{create_proof, keygen_pk, keygen_vk, verify_proof, VerifyingKey, MatrixConfig},
   poly::{
     commitment::Params,
     kzg::{
@@ -25,12 +25,12 @@ use halo2_proofs::{
 
 use crate::{model::ModelCircuit, utils::helpers::get_public_values};
 
-pub fn get_kzg_params(params_dir: &str, degree: u32) -> ParamsKZG<Bn256> {
+pub fn get_kzg_params(params_dir: &str, degree: u32, max_cqlin_degree: u32, max_cq_degree: u32) -> ParamsKZG<Bn256> {
   let rng = rand::thread_rng();
   let path = format!("{}/{}.params", params_dir, degree);
   let params_path = Path::new(&path);
   if File::open(&params_path).is_err() {
-    let params = ParamsKZG::<Bn256>::setup(degree, rng);
+    let params = ParamsKZG::<Bn256>::setup(degree, max_cqlin_degree, max_cq_degree, rng);
     let mut buf = Vec::new();
 
     params.write(&mut buf).expect("Failed to write params");
@@ -45,6 +45,36 @@ pub fn get_kzg_params(params_dir: &str, degree: u32) -> ParamsKZG<Bn256> {
   params
 }
 
+pub fn get_cqlin_kzg_params(params: &ParamsKZG<Bn256>, cqlin_params_dir: &str, lengths: Vec<usize>) -> HashMap<usize, ParamsKZG<Bn256>> {
+  let rng = rand::thread_rng();
+  let mut hashmap = HashMap::new();
+
+  for k in lengths.iter() {
+    let path = format!("{}/{}-{}.params", cqlin_params_dir, k, params.k());
+    let params_path = Path::new(&path);
+    if File::open(&params_path).is_err() {
+      // attempt to resize the params
+      let mut cqlin_params = params.clone();
+      cqlin_params.resize(*k as u32);
+
+      let mut buf = vec![];
+      cqlin_params.write(&mut buf).expect("Failed to write cqlin params");
+      let mut file = File::create(&params_path).expect("Failed to create cqlin params file");
+      file
+        .write_all(&buf[..])
+        .expect("Failed to write cqlin params to file");
+
+      let mut params_fs = File::open(&params_path).expect("couldn't load params");
+      let params = ParamsKZG::<Bn256>::read(&mut params_fs).expect("Failed to read params");
+      hashmap.insert(*k, params);
+    }
+  }
+
+  hashmap
+}
+
+// pub fn get_cq_kzg_params(cq_params_dir: &str, )
+
 pub fn serialize(data: &Vec<u8>, path: &str) -> u64 {
   let mut file = File::create(path).unwrap();
   file.write_all(data).unwrap();
@@ -53,19 +83,30 @@ pub fn serialize(data: &Vec<u8>, path: &str) -> u64 {
 
 pub fn verify_kzg(
   params: &ParamsKZG<Bn256>,
-  vk: &VerifyingKey<G1Affine>,
+  cqlin_params: &HashMap<usize, &ParamsKZG<Bn256>>,
+  vk: &VerifyingKey<Bn256, G1Affine>,
   strategy: SingleStrategy<Bn256>,
+  mut small_strategy: HashMap<usize, SingleStrategy<Bn256>>,
   public_vals: &Vec<Fr>,
   mut transcript: Blake2bRead<&[u8], G1Affine, Challenge255<G1Affine>>,
 ) {
   assert!(
     verify_proof::<
+      Bn256,
       KZGCommitmentScheme<Bn256>,
       VerifierSHPLONK<'_, Bn256>,
       Challenge255<G1Affine>,
       Blake2bRead<&[u8], G1Affine, Challenge255<G1Affine>>,
       halo2_proofs::poly::kzg::strategy::SingleStrategy<'_, Bn256>,
-    >(&params, &vk, strategy, &[&[&public_vals]], &mut transcript)
+    >(
+      &params,
+      cqlin_params,
+      &vk,
+      strategy,
+      small_strategy,
+      &[&[&public_vals]], 
+      &mut transcript
+    )
     .is_ok(),
     "proof did not verify"
   );
@@ -75,8 +116,12 @@ pub fn time_circuit_kzg(circuit: ModelCircuit<Fr>) {
   let rng = rand::thread_rng();
   let start = Instant::now();
 
+  // ZKML-TODO: Ensure that this is accurate;
   let degree = circuit.k as u32;
-  let params = get_kzg_params("./params_kzg", degree);
+  let cqlin_degree = circuit.k as u32;
+  let cq_degree = circuit.k as u32;
+  let params = get_kzg_params("./params_kzg", degree, cqlin_degree, cq_degree);
+  let cqlin_params = get_cqlin_kzg_params(&params, "./cqlin_params_kzg", vec![]);
 
   let circuit_duration = start.elapsed();
   println!(
@@ -85,7 +130,7 @@ pub fn time_circuit_kzg(circuit: ModelCircuit<Fr>) {
   );
 
   let vk_circuit = circuit.clone();
-  let vk = keygen_vk(&params, &vk_circuit).unwrap();
+  let vk = keygen_vk(&params, &cqlin_params, &vk_circuit).unwrap();
   drop(vk_circuit);
   let vk_duration = start.elapsed();
   println!(
