@@ -13,7 +13,7 @@ use super::gadget::{Gadget, GadgetConfig, GadgetType};
 
 type BiasDivRoundRelu6Config = GadgetConfig;
 
-const NUM_COLS_PER_OP: usize = 5;
+const NUM_COLS_PER_OP: usize = 3;
 
 pub struct BiasDivRoundRelu6Chip<F: PrimeField> {
   config: Rc<BiasDivRoundRelu6Config>,
@@ -55,60 +55,61 @@ impl<F: PrimeField> BiasDivRoundRelu6Chip<F> {
     // TENSOR TODO: You don't even know how big each of the columns are. Figure this out! I thi
     // let cq_relu_lookup = meta.cq_lookup_table_column(gadget_config.k);
 
-    meta.create_gate("bias_mul", |meta| {
-      let s = meta.query_selector(selector);
+    println!("HELLO");
+    // meta.create_gate("bias_mul", |meta| {
+    //   let s = meta.query_selector(selector);
 
-      let mut constraints = vec![];
-      for op_idx in 0..columns.len() / NUM_COLS_PER_OP {
-        let offset = op_idx * NUM_COLS_PER_OP;
-        let inp = meta.query_advice(columns[offset + 0], Rotation::cur());
-        let bias = meta.query_advice(columns[offset + 1], Rotation::cur());
-        let div_res = meta.query_advice(columns[offset + 2], Rotation::cur());
-        let mod_res = meta.query_advice(columns[offset + 3], Rotation::cur());
+    //   let mut constraints = vec![];
+    //   for op_idx in 0..columns.len() / NUM_COLS_PER_OP {
+    //     let offset = op_idx * NUM_COLS_PER_OP;
+    //     let inp = meta.query_advice(columns[offset + 0], Rotation::cur());
+    //     let bias = meta.query_advice(columns[offset + 1], Rotation::cur());
+    //     let div_res = meta.query_advice(columns[offset + 2], Rotation::cur());
+    //     let mod_res = meta.query_advice(columns[offset + 3], Rotation::cur());
 
-        // ((div - bias) * 2 + mod) * sf = 2 * inp + sf
-        constraints.push(
-          s.clone()
-            * (two.clone() * inp + sf.clone()
-              - (sf.clone() * two.clone() * (div_res - bias) + mod_res)),
-        );
-      }
+    //     // ((div - bias) * 2 + mod) * sf = 2 * inp + sf
+    //     constraints.push(
+    //       s.clone()
+    //         * (two.clone() * inp + sf.clone()
+    //           - (sf.clone() * two.clone() * (div_res - bias) + mod_res)),
+    //     );
+    //   }
 
-      constraints
-    });
+    //   constraints
+    // });
 
     for op_idx in 0..columns.len() / NUM_COLS_PER_OP {
       let offset = op_idx * NUM_COLS_PER_OP;
 
-      meta.lookup("bias_div_relu6 lookup", |meta| {
-        let s = meta.query_selector(selector);
-        let mod_res = meta.query_advice(columns[offset + 3], Rotation::cur());
-        // Constrains that the modulus \in [0, DIV_VAL)
-        // div_val - mod_res \in [0, max_val)
-        vec![(s.clone() * (two.clone() * sf.clone() - mod_res), div_lookup)]
-      });
+      // meta.lookup("bias_div_relu6 lookup", |meta| {
+      //   let s = meta.query_selector(selector);
+      //   let mod_res = meta.query_advice(columns[offset + 3], Rotation::cur());
+      //   // Constrains that the modulus \in [0, DIV_VAL)
+      //   // div_val - mod_res \in [0, max_val)
+      //   vec![(s.clone() * (two.clone() * sf.clone() - mod_res), div_lookup)]
+      // });
 
       meta.cq_lookup(|meta| {
         let s = meta.query_selector(selector);
-        let mod_res = meta.query_advice(columns[offset + 3], Rotation::cur());
+        let mod_res = meta.query_advice(columns[offset + 1], Rotation::cur());
         // Constrains that the modulus \in [0, DIV_VAL)
         // div_val - mod_res \in [0, max_val)
         vec![(s.clone() * (two.clone() * sf.clone() - mod_res), cq_div_lookup)]
       });
 
-      meta.lookup("bias_div_relu6 lookup", |meta| {
-        let s = meta.query_selector(selector);
-        let div = meta.query_advice(columns[offset + 2], Rotation::cur());
-        let outp = meta.query_advice(columns[offset + 4], Rotation::cur());
-        let div_outp_min_val = gadget_config.div_outp_min_val;
-        let div_outp_min_val = Expression::Constant(F::from((-div_outp_min_val) as u64));
+      // meta.lookup("bias_div_relu6 lookup", |meta| {
+      //   let s = meta.query_selector(selector);
+      //   let div = meta.query_advice(columns[offset + 2], Rotation::cur());
+      //   let outp = meta.query_advice(columns[offset + 4], Rotation::cur());
+      //   let div_outp_min_val = gadget_config.div_outp_min_val;
+      //   let div_outp_min_val = Expression::Constant(F::from((-div_outp_min_val) as u64));
 
-        // Constrains that output \in [0, 6 * SF]
-        vec![
-          (s.clone() * (div + div_outp_min_val), div_lookup),
-          (s.clone() * outp, relu_lookup),
-        ]
-      });
+      //   // Constrains that output \in [0, 6 * SF]
+      //   vec![
+      //     (s.clone() * (div + div_outp_min_val), div_lookup),
+      //     (s.clone() * outp, relu_lookup),
+      //   ]
+      // });
     }
 
     let mut selectors = gadget_config.selectors;
@@ -124,6 +125,7 @@ impl<F: PrimeField> BiasDivRoundRelu6Chip<F> {
       gadget_config.num_rows as i64,
     );
     maps.insert(GadgetType::BiasDivRoundRelu6, vec![relu_map]);
+    println!("HELLO");
 
     GadgetConfig {
       columns,
@@ -150,7 +152,7 @@ impl<F: PrimeField> Gadget<F> for BiasDivRoundRelu6Chip<F> {
   }
 
   fn num_outputs_per_row(&self) -> usize {
-    self.num_inputs_per_row() * 2
+    self.num_inputs_per_row()
   }
 
 
@@ -268,32 +270,32 @@ impl<F: PrimeField> Gadget<F> for BiasDivRoundRelu6Chip<F> {
         .copy_advice(|| "", region, self.config.columns[offset + 1], row_offset)
         .unwrap();
 
-      // Assign div_res, mod_res
-      let div_res_cell = region
-        .assign_advice(
-          || "div_res",
-          self.config.columns[offset + 2],
-          row_offset,
-          || {
-            div_res.map(|x: i64| {
-              F::from((x - div_outp_min_val_i64) as u64) - F::from(-div_outp_min_val_i64 as u64)
-            })
-          },
-        )
-        .unwrap();
-      let _mod_res_cell = region
-        .assign_advice(
-          || "mod_res",
-          self.config.columns[offset + 3],
-          row_offset,
-          || mod_res.map(|x: i64| F::from(x as u64)),
-        )
-        .unwrap();
+      // // Assign div_res, mod_res
+      // let div_res_cell = region
+      //   .assign_advice(
+      //     || "div_res",
+      //     self.config.columns[offset + 2],
+      //     row_offset,
+      //     || {
+      //       div_res.map(|x: i64| {
+      //         F::from((x - div_outp_min_val_i64) as u64) - F::from(-div_outp_min_val_i64 as u64)
+      //       })
+      //     },
+      //   )
+      //   .unwrap();
+      // let _mod_res_cell = region
+      //   .assign_advice(
+      //     || "mod_res",
+      //     self.config.columns[offset + 3],
+      //     row_offset,
+      //     || mod_res.map(|x: i64| F::from(x as u64)),
+      //   )
+      //   .unwrap();
 
       let outp_cell = region
         .assign_advice(
           || "outp",
-          self.config.columns[offset + 4],
+          self.config.columns[offset + 2],
           row_offset,
           || outp.map(|x: F| x.to_owned()),
         )
@@ -301,7 +303,7 @@ impl<F: PrimeField> Gadget<F> for BiasDivRoundRelu6Chip<F> {
 
       // outp_cells.push((outp_cell, div_res_cell));
       outp_cells.push(outp_cell);
-      outp_cells.push(div_res_cell);
+      // outp_cells.push(div_res_cell);
     }
 
     Ok(outp_cells)
@@ -331,6 +333,6 @@ impl<F: PrimeField> Gadget<F> for BiasDivRoundRelu6Chip<F> {
         single_inputs,
       )
       .unwrap();
-    Ok(res[0..initial_len * 2].to_vec())
+    Ok(res[0..initial_len].to_vec())
   }
 }

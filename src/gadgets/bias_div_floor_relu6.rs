@@ -59,6 +59,7 @@ impl<F: PrimeField> BiasDivFloorRelu6Chip<F> {
     // let cq_relu_lookup = meta.cq_lookup_table_column(gadget_config.k);
     // let cq_div_lookup = meta.cq_lookup_table_column(gadget_config.k);
 
+    println!("HELLO 1");
     meta.create_gate("bias_mul", |meta| {
       let s = meta.query_selector(selector);
 
@@ -77,6 +78,7 @@ impl<F: PrimeField> BiasDivFloorRelu6Chip<F> {
 
       constraints
     });
+    println!("HELLO 1");
 
     // 6 columns
     // inp, bias -- constrain div and mod, and funnel out div through equality constrain.

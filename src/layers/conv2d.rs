@@ -396,14 +396,14 @@ impl<F: PrimeField> Layer<F> for Conv2DChip<F> {
     let outp = if conv_config.activation == ActivationType::Relu6 {
       outp
         .into_iter()
-        .step_by(2)
+        // .step_by(2)
         .map(|x| Rc::new(x))
         .collect::<Vec<_>>()
     } else if conv_config.activation == ActivationType::None {
       outp
         .into_iter()
-        .skip(1)
-        .step_by(2)
+        // .skip(1)
+        // .step_by(2)
         .map(|x| Rc::new(x))
         .collect::<Vec<_>>()
     } else if conv_config.activation == ActivationType::Relu {

@@ -44,6 +44,7 @@ impl<F: PrimeField> VarDivRoundBig3Chip<F> {
       let mut constraints = vec![];
 
       let b = meta.query_advice(columns[columns.len() - 1], Rotation::cur());
+      println!("b: {:?}", columns.len());
       for i in 0..(columns.len() - 1) / Self::num_cols_per_op() {
         let offset = i * Self::num_cols_per_op();
         // Constrain that (2 * a + b) = (2 * b) * c + r

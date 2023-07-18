@@ -454,20 +454,25 @@ impl<F: PrimeField + Ord + FromUniformBytes<64>> ModelCircuit<F> {
     let used_gadgets = Arc::new(used_gadgets);
     let gadget = &GADGET_CONFIG;
     let cloned_gadget = gadget.lock().unwrap().clone();
+    println!("num_cols {:?}", config.num_cols);
+    println!("num_cols {:?}", config.k);
+
+    let k = config.k as usize;
+    
     *gadget.lock().unwrap() = GadgetConfig {
       scale_factor: config.global_sf as u64,
       shift_min_val: -(config.global_sf * config.global_sf * (1 << 17)),
-      div_outp_min_val: -(1 << (config.k - 1)),
-      min_val: -(1 << (config.k - 1)),
-      max_val: (1 << (config.k - 1)) - 10,
-      k: config.k as usize,
-      num_rows: (1 << config.k) - 10 + 1,
+      div_outp_min_val: -(1 << (k - 1)),
+      min_val: -(1 << (k - 1)),
+      max_val: (1 << (k - 1)) - 10,
+      k: k as usize,
+      num_rows: (1 << k) - 10 + 1,
       num_cols: config.num_cols as usize,
       used_gadgets: used_gadgets.clone(),
       commit_before: config.commit_before.clone().unwrap_or(vec![]),
       commit_after: config.commit_after.clone().unwrap_or(vec![]),
       use_selectors: config.use_selectors.unwrap_or(true),
-      num_bits_per_elem: config.bits_per_elem.unwrap_or(config.k),
+      num_bits_per_elem: config.bits_per_elem.unwrap_or(k as i64),
       ..cloned_gadget
     };
 
@@ -475,8 +480,8 @@ impl<F: PrimeField + Ord + FromUniformBytes<64>> ModelCircuit<F> {
       tensors,
       dag_config,
       used_gadgets,
-      k: config.k as usize,
-      bits_per_elem: config.bits_per_elem.unwrap_or(config.k) as usize,
+      k: k as usize,
+      bits_per_elem: config.bits_per_elem.unwrap_or(k as i64) as usize,
       inp_idxes: config.inp_idxes.clone(),
       commit_after: config.commit_after.unwrap_or(vec![]),
       commit_before: config.commit_before.unwrap_or(vec![]),
