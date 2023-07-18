@@ -3,7 +3,7 @@ use std::{marker::PhantomData, rc::Rc};
 use halo2_proofs::{
   circuit::{AssignedCell, Layouter, Region, Value},
   halo2curves::ff::PrimeField,
-  plonk::{ConstraintSystem, Error},
+  plonk::{ConstraintSystem, Error, Assigned},
 };
 
 use super::gadget::{Gadget, GadgetConfig, GadgetType};
@@ -23,11 +23,16 @@ impl<F: PrimeField> InputLookupChip<F> {
 
   pub fn configure(meta: &mut ConstraintSystem<F>, gadget_config: GadgetConfig) -> GadgetConfig {
     let lookup = meta.lookup_table_column();
+    // ZKML TODO: Ensure that you fix this
+    let cq_lookup = meta.cq_lookup_table_column(gadget_config.k);
     let mut tables = gadget_config.tables;
+    let mut cq_tables = gadget_config.cq_tables;
     tables.insert(GadgetType::InputLookup, vec![lookup]);
+    cq_tables.insert(GadgetType::InputLookup, vec![cq_lookup]);
 
     GadgetConfig {
       tables,
+      cq_tables,
       ..gadget_config
     }
   }
@@ -36,6 +41,17 @@ impl<F: PrimeField> InputLookupChip<F> {
 impl<F: PrimeField> Gadget<F> for InputLookupChip<F> {
   fn load_lookups(&self, mut layouter: impl Layouter<F>) -> Result<(), Error> {
     let lookup = self.config.tables[&GadgetType::InputLookup][0];
+    let cq_lookup = self.config.cq_tables[&GadgetType::InputLookup][0];
+    
+    // load cq lookups
+    layouter
+      .assign_cq_table(
+        cq_lookup,
+        &(0..(1 << self.config.k))
+          .map(|i| F::from(i as u64))
+          .map(|val| Assigned::from(val))
+          .collect::<Vec<_>>()
+      ).unwrap();
 
     layouter
       .assign_table(

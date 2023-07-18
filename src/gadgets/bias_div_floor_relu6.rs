@@ -9,7 +9,7 @@ use halo2_proofs::{
 
 use crate::gadgets::gadget::convert_to_u64;
 
-use super::gadget::{Gadget, GadgetConfig, GadgetType};
+use super::gadget::{Gadget, GadgetConfig, GadgetType, self};
 
 type BiasDivFloorRelu6Config = GadgetConfig;
 
@@ -49,10 +49,15 @@ impl<F: PrimeField> BiasDivFloorRelu6Chip<F> {
     let selector = meta.complex_selector();
     let sf = Expression::Constant(F::from(gadget_config.scale_factor));
     let columns = gadget_config.columns;
+    let cq_columns = gadget_config.cq_columns;
 
     let mod_lookup = meta.lookup_table_column();
     let relu_lookup = meta.lookup_table_column();
     let div_lookup = meta.lookup_table_column();
+
+    // let cq_mod_lookup = meta.cq_lookup_table_column(gadget_config.k);
+    // let cq_relu_lookup = meta.cq_lookup_table_column(gadget_config.k);
+    // let cq_div_lookup = meta.cq_lookup_table_column(gadget_config.k);
 
     meta.create_gate("bias_mul", |meta| {
       let s = meta.query_selector(selector);
@@ -67,9 +72,19 @@ impl<F: PrimeField> BiasDivFloorRelu6Chip<F> {
 
         constraints.push(s.clone() * (inp - (sf.clone() * (div_res - bias) + mod_res)));
       }
+      // SF * (q - bias) + r == inp
+      // (q - bias)
 
       constraints
     });
+
+    // 6 columns
+    // inp, bias -- constrain div and mod, and funnel out div through equality constrain.
+    // check that mod is < SF
+    // relu out the thing.
+    // so we have inp, and bias.
+    // (2^17 * 2^17). WHat we could do... is... do a big table, and output
+    // 
 
     for op_idx in 0..columns.len() / Self::num_cols_per_op() {
       let offset = op_idx * Self::num_cols_per_op();
@@ -80,19 +95,34 @@ impl<F: PrimeField> BiasDivFloorRelu6Chip<F> {
         // Constrains that the modulus \in [0, DIV_VAL)
         vec![(s.clone() * mod_res.clone(), mod_lookup)]
       });
-      meta.lookup("bias_div_relu6 lookup", |meta| {
-        let s = meta.query_selector(selector);
-        let div = meta.query_advice(columns[offset + 2], Rotation::cur());
-        let outp = meta.query_advice(columns[offset + 4], Rotation::cur());
-        let div_outp_min_val = Expression::Constant(F::from((-SHIFT_MIN_VAL) as u64));
 
-        // Constrains that output \in [0, 6 * SF]
-        vec![
-          (s.clone() * outp, relu_lookup),
-          (s * (div + div_outp_min_val), div_lookup),
-        ]
-      });
+      // meta.lookup("bias_div_relu6 lookup", |meta| {
+      //   let s = meta.query_selector(selector);
+      //   let div = meta.query_advice(columns[offset + 2], Rotation::cur());
+      //   let outp = meta.query_advice(columns[offset + 4], Rotation::cur());
+      //   let div_outp_min_val = Expression::Constant(F::from((-SHIFT_MIN_VAL) as u64));
+
+      //   // Constrains that output \in [0, 6 * SF]
+      //   vec![
+      //     (s.clone() * outp, relu_lookup),
+      //     (s * (div + div_outp_min_val), div_lookup),
+      //   ]
+      // });
+
+      // meta.cq_lookup(|meta| {
+      //   let s = meta.query_selector(selector);
+      //   let div = meta.query_advice(columns[offset + 2], Rotation::cur());
+      //   let outp = meta.query_advice(columns[offset + 4], Rotation::cur());
+      //   let div_outp_min_val = Expression::Constant(F::from((-SHIFT_MIN_VAL) as u64));
+  
+      //   vec![
+      //     (s.clone() * outp, cq_relu_lookup),
+      //     (s * (div + div_outp_min_val), cq_div_lookup),
+      //   ]
+      // });  
     }
+
+
 
     let mut selectors = gadget_config.selectors;
     selectors.insert(GadgetType::BiasDivFloorRelu6, vec![selector]);
@@ -102,6 +132,12 @@ impl<F: PrimeField> BiasDivFloorRelu6Chip<F> {
       GadgetType::BiasDivFloorRelu6,
       vec![mod_lookup, relu_lookup, div_lookup],
     );
+
+    // let mut cq_tables = gadget_config.cq_tables;
+    // cq_tables.insert(
+    //   GadgetType::BiasDivFloorRelu6,
+    //   vec![cq_mod_lookup, cq_relu_lookup, cq_div_lookup],
+    // );
 
     let mut maps = gadget_config.maps;
     let relu_map = Self::get_map(
@@ -113,8 +149,10 @@ impl<F: PrimeField> BiasDivFloorRelu6Chip<F> {
 
     GadgetConfig {
       columns,
+      cq_columns,
       selectors,
       tables,
+      // cq_tables,
       maps,
       ..gadget_config
     }

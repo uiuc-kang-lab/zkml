@@ -579,6 +579,14 @@ impl<F: PrimeField + Ord + FromUniformBytes<64>> Circuit<F> for ModelCircuit<F> 
     }
     gadget_config.columns = columns;
 
+    let cq_columns = (0..gadget_config.num_cq_cols)
+      .map(|_| meta.advice_column())
+      .collect::<Vec<_>>();
+    for col in cq_columns.iter() {
+      meta.enable_equality(*col);
+    }
+    gadget_config.cq_columns = cq_columns;
+
     let public_col = meta.instance_column();
     meta.enable_equality(public_col);
 

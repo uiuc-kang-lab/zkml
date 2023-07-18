@@ -6,7 +6,7 @@ use std::{
 use halo2_proofs::{
   circuit::{AssignedCell, Layouter, Region},
   halo2curves::group::ff::PrimeField,
-  plonk::{Advice, Column, Error, Fixed, Selector, TableColumn},
+  plonk::{Advice, Column, Error, Fixed, Selector, TableColumn, CqColumn},
 };
 use num_bigint::{BigUint, ToBigUint};
 use num_traits::cast::ToPrimitive;
@@ -44,14 +44,18 @@ pub enum GadgetType {
 pub struct GadgetConfig {
   pub used_gadgets: Arc<BTreeSet<GadgetType>>,
   pub columns: Vec<Column<Advice>>,
+  pub cq_columns: Vec<Column<Advice>>,
   pub fixed_columns: Vec<Column<Fixed>>,
   pub selectors: HashMap<GadgetType, Vec<Selector>>,
   pub tables: HashMap<GadgetType, Vec<TableColumn>>,
+  pub column_idx: u64,
+  pub cq_tables: HashMap<GadgetType, Vec<CqColumn>>,
   pub maps: HashMap<GadgetType, Vec<HashMap<i64, i64>>>,
   pub scale_factor: u64,
   pub shift_min_val: i64, // MUST be divisible by 2 * scale_factor
   pub num_rows: usize,
   pub num_cols: usize,
+  pub num_cq_cols: usize,
   pub k: usize,
   pub eta: f64,
   pub min_val: i64,

@@ -3,7 +3,7 @@ use std::{collections::HashMap, marker::PhantomData, rc::Rc};
 use halo2_proofs::{
   circuit::{AssignedCell, Layouter, Region, Value},
   halo2curves::ff::PrimeField,
-  plonk::{ConstraintSystem, Error, Expression},
+  plonk::{ConstraintSystem, Error, Expression, Assigned},
   poly::Rotation,
 };
 
@@ -47,8 +47,13 @@ impl<F: PrimeField> BiasDivRoundRelu6Chip<F> {
     let columns = gadget_config.columns;
 
     let mut tables = gadget_config.tables;
+    let mut cq_tables = gadget_config.cq_tables;
     let div_lookup = tables.get(&GadgetType::InputLookup).unwrap()[0];
     let relu_lookup = meta.lookup_table_column();
+
+    let cq_div_lookup = cq_tables.get(&GadgetType::InputLookup).unwrap()[0];
+    // TENSOR TODO: You don't even know how big each of the columns are. Figure this out! I thi
+    // let cq_relu_lookup = meta.cq_lookup_table_column(gadget_config.k);
 
     meta.create_gate("bias_mul", |meta| {
       let s = meta.query_selector(selector);
@@ -74,14 +79,23 @@ impl<F: PrimeField> BiasDivRoundRelu6Chip<F> {
 
     for op_idx in 0..columns.len() / NUM_COLS_PER_OP {
       let offset = op_idx * NUM_COLS_PER_OP;
+
       meta.lookup("bias_div_relu6 lookup", |meta| {
         let s = meta.query_selector(selector);
         let mod_res = meta.query_advice(columns[offset + 3], Rotation::cur());
-
         // Constrains that the modulus \in [0, DIV_VAL)
         // div_val - mod_res \in [0, max_val)
         vec![(s.clone() * (two.clone() * sf.clone() - mod_res), div_lookup)]
       });
+
+      meta.cq_lookup(|meta| {
+        let s = meta.query_selector(selector);
+        let mod_res = meta.query_advice(columns[offset + 3], Rotation::cur());
+        // Constrains that the modulus \in [0, DIV_VAL)
+        // div_val - mod_res \in [0, max_val)
+        vec![(s.clone() * (two.clone() * sf.clone() - mod_res), cq_div_lookup)]
+      });
+
       meta.lookup("bias_div_relu6 lookup", |meta| {
         let s = meta.query_selector(selector);
         let div = meta.query_advice(columns[offset + 2], Rotation::cur());
@@ -101,6 +115,7 @@ impl<F: PrimeField> BiasDivRoundRelu6Chip<F> {
     selectors.insert(GadgetType::BiasDivRoundRelu6, vec![selector]);
 
     tables.insert(GadgetType::BiasDivRoundRelu6, vec![relu_lookup]);
+    // cq_tables.insert(GadgetType::BiasDivRoundRelu6, vec![cq_relu_lookup]);
 
     let mut maps = gadget_config.maps;
     let relu_map = Self::get_map(
@@ -114,6 +129,7 @@ impl<F: PrimeField> BiasDivRoundRelu6Chip<F> {
       columns,
       selectors,
       tables,
+      cq_tables,
       maps,
       ..gadget_config
     }
@@ -137,10 +153,23 @@ impl<F: PrimeField> Gadget<F> for BiasDivRoundRelu6Chip<F> {
     self.num_inputs_per_row() * 2
   }
 
+
   fn load_lookups(&self, mut layouter: impl Layouter<F>) -> Result<(), Error> {
     let map = &self.config.maps[&GadgetType::BiasDivRoundRelu6][0];
 
     let relu_lookup = self.config.tables[&GadgetType::BiasDivRoundRelu6][0];
+    // let cq_relu_lookup = self.config.cq_tables[&GadgetType::BiasDivRoundRelu6][0];
+    
+    // load cq lookups
+    // layouter
+    //   .assign_cq_table(
+    //     cq_relu_lookup,
+    //     &(0..self.config.num_rows)
+    //       .map(|i| map.get(&(i as i64)).unwrap())
+    //       .map(|val| F::from(*val as u64))
+    //       .map(|val| Assigned::from(val))
+    //       .collect::<Vec<_>>()
+    //   ).unwrap();
 
     layouter
       .assign_table(

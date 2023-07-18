@@ -116,12 +116,17 @@ pub fn time_circuit_kzg(circuit: ModelCircuit<Fr>) {
   let rng = rand::thread_rng();
   let start = Instant::now();
 
+  println!("Hello");
+
   // ZKML-TODO: Ensure that this is accurate;
   let degree = circuit.k as u32;
-  let cqlin_degree = circuit.k as u32;
+  let cqlin_degree = (circuit.k / 2) as u32;
   let cq_degree = circuit.k as u32;
   let params = get_kzg_params("./params_kzg", degree, cqlin_degree, cq_degree);
+  println!("Hello");
   let cqlin_params = get_cqlin_kzg_params(&params, "./cqlin_params_kzg", vec![]);
+
+  println!("Hello");
 
   let circuit_duration = start.elapsed();
   println!(
@@ -235,7 +240,7 @@ pub fn verify_circuit_kzg(
 ) {
   // ZKML TODO
   let degree = circuit.k as u32;
-  let cqlin_degree = circuit.k as u32;
+  let cqlin_degree = (circuit.k / 2) as u32;
   let cq_degree = circuit.k as u32;
 
   let params = get_kzg_params("./params_kzg", degree, cqlin_degree, cq_degree);
