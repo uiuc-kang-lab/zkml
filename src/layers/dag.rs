@@ -104,6 +104,7 @@ impl<F: PrimeField + Ord> VectorEngine<F> {
 //   }
 // }
 
+#[derive(Clone)]
 pub enum TensorAssignedOrUnassigned<F: PrimeField + Ord> {
   Unassigned(Array<F, IxDyn>),
   Assigned(AssignedTensor<F>)
@@ -121,11 +122,11 @@ impl<F: PrimeField + Ord> DAGLayerChip<F> {
   // Note: For our commitments, you should create fixed 'tensor columns'
   // and use the commitments to those (with a constant blinding factor)
   // as the commitment. Also note how you can do the fast commitments.
-  pub fn assign_tensor_map(
+  pub fn assign_tensor(
     &self,
     mut layouter: impl Layouter<F>,
     columns: &Vec<Column<Advice>>,
-    tensor: Array<F, IxDyn>,
+    tensor: &Array<F, IxDyn>,
   ) -> Result<AssignedTensor<F>, Error> {
     let tensors = layouter.assign_region(
       || "asssignment",
@@ -251,7 +252,7 @@ impl<F: PrimeField + Ord> DAGLayerChip<F> {
     constants: &HashMap<i64, CellRc<F>>,
     gadget_config: Rc<GadgetConfig>,
     _layer_config: &LayerConfig,
-  ) -> Result<(HashMap<usize, AssignedTensor<F>>, Vec<AssignedTensor<F>>), Error> {
+  ) -> Result<(HashMap<usize, TensorAssignedOrUnassigned<F>>, Vec<TensorAssignedOrUnassigned<F>>), Error> {
     // We only assign things in the tensor when we do not use them as weights.
 
     // let tensors = self.assign_tensors_vec(
@@ -260,7 +261,7 @@ impl<F: PrimeField + Ord> DAGLayerChip<F> {
     //   &tensors,
     // ).unwrap();
 
-    let tensor_map = self.initialized_unassigned_tensors_map(tensors);
+    let mut tensor_map = self.initialized_unassigned_tensors_map(tensors);
 
     // Compute the dag
     for (layer_idx, layer_config) in self.dag_config.ops.iter().enumerate() {
@@ -283,22 +284,25 @@ impl<F: PrimeField + Ord> DAGLayerChip<F> {
       // ZKML TODO: This is a decently pretty bad software architecture choice?
       // Probably is a cleaner way to do this.
       let mut flex_vec_inps = vec![];
-      for (ix, &raw_inp) in raw_vec_inps.iter().enumerate() {
+      for (ix, raw_inp) in raw_vec_inps.iter().enumerate() {
         // If we are in a "weights" section, then we will 
-        if layer_type == &LayerType::Conv2D && ix == 2 {
-
+        // In this case, never assign
+        if layer_type == &LayerType::Conv2D && ix == 10 {
+          flex_vec_inps.push(raw_inp.clone());
         } else {
-
-        }
-        match raw_inp {
-          &TensorAssignedOrUnassigned::Unassigned(inp) => {
-            // Convert the vector to an assigned vector
-
-          },
-          &TensorAssignedOrUnassigned::Assigned(inp) => {
-            vec_inps.push(inp);
+          match raw_inp {
+            TensorAssignedOrUnassigned::Assigned(inp) => {
+              vec_inps.push(inp.clone());
+            },
+            TensorAssignedOrUnassigned::Unassigned(inp) => {
+              // If it is some random component, we replace and send it.
+              let assigned_inp = self.assign_tensor(layouter.namespace(|| ""), &gadget_config.columns, inp)?;
+              // tensor_map.insert(inp_idxes[ix], TensorAssignedOrUnassigned::Assigned(assigned_inp.clone()));
+              vec_inps.push(assigned_inp);
+            }
           }
         }
+
         
       }
       
@@ -645,7 +649,7 @@ impl<F: PrimeField + Ord> DAGLayerChip<F> {
 
       for (idx, tensor_idx) in out_idxes.iter().enumerate() {
         println!("Out {} shape: {:?}", idx, out[idx].shape());
-        tensor_map.insert(*tensor_idx, out[idx].clone());
+        tensor_map.insert(*tensor_idx, TensorAssignedOrUnassigned::Assigned(out[idx].clone()));
       }
     }
 
@@ -666,25 +670,25 @@ impl<F: PrimeField + Ord> DAGLayerChip<F> {
       }
     };
 
-    let tmp = print_arr.iter().map(|x| x.as_ref()).collect::<Vec<_>>();
-    print_assigned_arr("final out", &tmp.to_vec(), gadget_config.scale_factor);
+    // let tmp = print_arr.iter().map(|x| x.as_ref()).collect::<Vec<_>>();
+    // print_assigned_arr("final out", &tmp.to_vec(), gadget_config.scale_factor);
     println!("final out idxes: {:?}", self.dag_config.final_out_idxes);
 
-    let mut x = vec![];
-    for cell in print_arr.iter() {
-      cell.value().map(|v| {
-        let bias = 1 << 60 as i64;
-        let v_pos = *v + F::from(bias as u64);
-        let v = convert_to_u64(&v_pos) as i64 - bias;
-        x.push(v);
-      });
-    }
-    if x.len() > 0 {
-      let out_fname = "out.msgpack";
-      let f = File::create(out_fname).unwrap();
-      let mut buf = BufWriter::new(f);
-      rmp_serde::encode::write_named(&mut buf, &x).unwrap();
-    }
+    // let mut x = vec![];
+    // for cell in print_arr.iter() {
+    //   cell.value().map(|v| {
+    //     let bias = 1 << 60 as i64;
+    //     let v_pos = *v + F::from(bias as u64);
+    //     let v = convert_to_u64(&v_pos) as i64 - bias;
+    //     x.push(v);
+    //   });
+    // }
+    // if x.len() > 0 {
+    //   let out_fname = "out.msgpack";
+    //   let f = File::create(out_fname).unwrap();
+    //   let mut buf = BufWriter::new(f);
+    //   rmp_serde::encode::write_named(&mut buf, &x).unwrap();
+    // }
 
     Ok((tensor_map, final_out))
   }

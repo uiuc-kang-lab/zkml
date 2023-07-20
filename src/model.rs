@@ -736,7 +736,7 @@ impl<F: PrimeField + Ord + FromUniformBytes<64>> Circuit<F> for ModelCircuit<F> 
       .unwrap();
 
 
-    let mut commitments = vec![];
+    // let mut commitments = vec![];
 
     // let tensors = if self.commit_before.len() > 0 {
     //   // Commit to the tensors before the DAG
@@ -795,7 +795,7 @@ impl<F: PrimeField + Ord + FromUniformBytes<64>> Circuit<F> for ModelCircuit<F> 
 
     // Perform the dag
     let dag_chip = DAGLayerChip::<F>::construct(self.dag_config.clone());
-    let (final_tensor_map, result) = dag_chip.forward(
+    let (final_tensor_map, _result) = dag_chip.forward(
       layouter.namespace(|| "dag"),
       &self.tensors,
       &constants,
@@ -803,45 +803,39 @@ impl<F: PrimeField + Ord + FromUniformBytes<64>> Circuit<F> for ModelCircuit<F> 
       &LayerConfig::default(),
     )?;
 
-    if self.commit_after.len() > 0 {
-      for commit_idxes in self.commit_after.iter() {
-        let to_commit = BTreeMap::from_iter(commit_idxes.iter().map(|idx| {
-          (
-            *idx,
-            final_tensor_map.get(&(*idx as usize)).unwrap().clone(),
-          )
-        }));
-        let commitment = self.copy_and_commit(
-          layouter.namespace(|| "commit"),
-          &constants,
-          &config,
-          &to_commit,
-        );
-        commitments.push(commitment);
-      }
-    }
+    // if self.commit_after.len() > 0 {
+    //   for commit_idxes in self.commit_after.iter() {
+    //     let to_commit = BTreeMap::from_iter(commit_idxes.iter().map(|idx| {
+    //       (
+    //         *idx,
+    //         final_tensor_map.get(&(*idx as usize)).unwrap().clone(),
+    //       )
+    //     }));
+    //     let commitment = self.copy_and_commit(
+    //       layouter.namespace(|| "commit"),
+    //       &constants,
+    //       &config,
+    //       &to_commit,
+    //     );
+    //     commitments.push(commitment);
+    //   }
+    // }
 
     let mut pub_layouter = layouter.namespace(|| "public");
     let mut total_idx = 0;
     let mut new_public_vals = vec![];
-    for cell in commitments.iter() {
-      pub_layouter
-        .constrain_instance(cell.as_ref().cell(), config.public_col, total_idx)
-        .unwrap();
-      let val = convert_to_bigint(cell.value().map(|x| x.to_owned()));
-      new_public_vals.push(val);
-      total_idx += 1;
-    }
-    for tensor in result {
-      for cell in tensor.iter() {
-        pub_layouter
-          .constrain_instance(cell.as_ref().cell(), config.public_col, total_idx)
-          .unwrap();
-        let val = convert_to_bigint(cell.value().map(|x| x.to_owned()));
-        new_public_vals.push(val);
-        total_idx += 1;
-      }
-    }
+
+    // for tensor in result {
+    //   for cell in tensor.iter() {
+    //     pub_layouter
+    //       .constrain_instance(cell.as_ref().cell(), config.public_col, total_idx)
+    //       .unwrap();
+    //     let val = convert_to_bigint(cell.value().map(|x| x.to_owned()));
+    //     new_public_vals.push(val);
+    //     total_idx += 1;
+    //   }
+    // }
+
     *PUBLIC_VALS.lock().unwrap() = new_public_vals;
 
     Ok(())
