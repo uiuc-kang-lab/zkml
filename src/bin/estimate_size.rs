@@ -1,7 +1,8 @@
 #![feature(int_roundings)]
 
-use std::marker::PhantomData;
+use std::{marker::PhantomData, collections::HashMap};
 
+use halo2_gadgets::ecc::chip::H;
 use halo2_proofs::halo2curves::bn256::Fr;
 use zkml::{
   layers::{
@@ -55,9 +56,10 @@ fn main() {
   println!("Total tensor + random size: {}", total_tensor_size);
   println!("Total rows for assignment: {}", num_rows);
 
+  let mut hash_map = HashMap::new();
+
   // Number of rows from layers
   for layer_config in circuit.dag_config.ops.iter() {
-    println!("{:?}", layer_config);
     let layer_rows = match layer_config.layer_type {
       LayerType::Add => {
         let chip = AddChip {};
@@ -200,10 +202,13 @@ fn main() {
         <UpdateChip as Layer<Fr>>::num_rows(&chip, &layer_config, num_cols)
       }
     };
+    let mut row = hash_map.entry(layer_config.layer_type).or_insert(0);
+    *row += layer_rows;
 
     num_rows += layer_rows;
   }
 
+  println!("Total number of rows: {:?}", hash_map);
   println!("Total number of rows: {}", num_rows);
   println!(
     "Total number of rows after blinding (estimated): {}",

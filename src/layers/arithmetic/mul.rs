@@ -77,15 +77,16 @@ impl<F: PrimeField> Layer<F> for MulChip {
 
   fn num_rows(&self, layer_config: &LayerConfig, num_cols: i64) -> i64 {
     let inp_size = <MulChip as Arithmetic<F>>::get_inp_size(layer_config);
+    println!("INPUT SIZE {:?}", inp_size);
 
     // Multiplication
     let num_mul_per_row = num_cols / 3;
     let mut num_rows = (inp_size as i64).div_ceil(num_mul_per_row);
 
-    // Division by the scale factor
-    // FIXME: should be taken from the gadgets...
-    let num_div_per_row = (num_cols - 1) / 3;
-    num_rows += (inp_size as i64).div_ceil(num_div_per_row);
+    // // Division by the scale factor
+    // // FIXME: should be taken from the gadgets...
+    // let num_div_per_row = (num_cols - 1) / 3;
+    // num_rows += (inp_size as i64).div_ceil(num_div_per_row);
 
     num_rows
   }

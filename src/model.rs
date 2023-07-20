@@ -1,3 +1,4 @@
+use core::panic;
 use std::{
   collections::{BTreeMap, BTreeSet, HashMap},
   marker::PhantomData,
@@ -8,7 +9,7 @@ use std::{
 use halo2_proofs::{
   circuit::{Layouter, SimpleFloorPlanner, Value},
   halo2curves::ff::{FromUniformBytes, PrimeField},
-  plonk::{Advice, Circuit, Column, ConstraintSystem, Error, Instance},
+  plonk::{Advice, Circuit, Column, ConstraintSystem, Error, Instance, MatrixConfig},
 };
 use lazy_static::lazy_static;
 use ndarray::{Array, IxDyn};
@@ -91,6 +92,64 @@ pub struct ModelCircuit<F: PrimeField> {
   pub inp_idxes: Vec<i64>,
   pub num_random: i64,
 }
+
+/// An object that logs all the matrix widths that are used in the cqlin argument.
+/// Matrix width essentially denotes the maximum width of the matrix
+/// that we can perform cqlin over
+/// 
+pub struct MatrixLog {
+  // We likely want to do something that is ordered.
+  pub matrices: Vec<MatrixConfig>
+}
+
+impl MatrixLog {
+  // Add new matrix to the matrix log
+  pub fn add(&mut self, mc: MatrixConfig) {
+    let mut ix = 0;
+    for m in self.matrices.iter() {
+      if mc.k > m.k {
+        ix += 1;
+      } else {
+        break;
+      }
+    }
+    self.matrices.insert(ix, mc);
+  }
+
+  // Get the MatrixConfig that we desire.
+  pub fn select_log(&self, matrix_height: usize) -> MatrixConfig {
+    for m in self.matrices.iter() {
+      if matrix_height <= ((1 << m.k) - 1) {
+        return m.clone();
+      }
+    }
+    panic!("No satisfying matrix configs found");
+  }
+}
+
+#[test]
+fn test_matrix_logs() {
+  let m1 = MatrixConfig {
+    k: 2,
+    l: 1
+  };
+  let m2 = MatrixConfig {
+    k: 3,
+    l: 1
+  };
+  let m3 = MatrixConfig {
+    k: 4,
+    l: 1
+  };
+  let mut ml = MatrixLog { matrices: vec![] };
+  ml.add(m3);
+  ml.add(m2);
+  ml.add(m1);
+  println!("{:?}", ml.matrices);
+
+  println!("{:?}", ml.select_log(5));
+}
+
 
 #[derive(Clone, Debug)]
 pub struct ModelConfig<F: PrimeField + Ord + FromUniformBytes<64>> {

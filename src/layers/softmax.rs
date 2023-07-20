@@ -223,8 +223,11 @@ impl<F: PrimeField> Layer<F> for SoftmaxChip {
       inp_shape[0] as i64 * softmax_flat_rows(inp_shape[1] as i64)
     } else if inp_shape.len() == 3 {
       inp_shape[0] as i64 * inp_shape[1] as i64 * softmax_flat_rows(inp_shape[2] as i64)
+    } else if inp_shape.len() == 4 {
+      inp_shape[0] as i64 * inp_shape[1] as i64 * inp_shape[2] as i64 * softmax_flat_rows(inp_shape[3] as i64)
     } else {
-      panic!("Not implemented");
+      0
+      // panic!("Not implemented");
     };
 
     num_rows
@@ -243,3 +246,11 @@ impl GadgetConsumer for SoftmaxChip {
     ]
   }
 }
+
+// Goals for the day ZKML: 
+// 1. CQ optimization
+// Test out the circuit and see whether it works
+// concern: - you only have one expression -- why is this the case?
+// 2. CQLIN optimization (done by 20/07/2023)
+// Make a global registry of things
+//

@@ -100,6 +100,7 @@ impl<F: PrimeField> Layer<F> for AddChip {
     let activation = self.get_activation(&layer_config.layer_params);
     match activation {
       ActivationType::Relu => {
+        println!("Add and Relu");
         let num_relu_per_row = num_cols / 2;
         num_rows += (inp_size as i64).div_ceil(num_relu_per_row);
       }

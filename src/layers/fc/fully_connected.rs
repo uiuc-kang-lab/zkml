@@ -150,6 +150,7 @@ impl<F: PrimeField> Layer<F> for FullyConnectedChip<F> {
     let implementation = layer_config.implementation_idx;
     match implementation {
       0 => {
+        println!("CONV 0");
         let chip = FCRLCVarDivLookupChip::<F> {
           config: self.config.clone(),
           _marker: PhantomData,
@@ -157,6 +158,7 @@ impl<F: PrimeField> Layer<F> for FullyConnectedChip<F> {
         chip.num_rows(layer_config, num_cols)
       }
       1 => {
+        println!("CONV 1");
         let chip = FCDPVarDivLookupChip::<F> {
           config: self.config.clone(),
           _marker: PhantomData,
@@ -164,6 +166,7 @@ impl<F: PrimeField> Layer<F> for FullyConnectedChip<F> {
         chip.num_rows(layer_config, num_cols)
       }
       2 => {
+        println!("CONV 2");
         let chip = FCDPBiasVarDivLookupChip::<F> {
           config: self.config.clone(),
           _marker: PhantomData,

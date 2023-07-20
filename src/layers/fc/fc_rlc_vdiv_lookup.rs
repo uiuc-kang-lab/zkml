@@ -224,17 +224,20 @@ impl<F: PrimeField> Layer<F> for FCRLCVarDivLookupChip<F> {
   fn num_rows(&self, layer_config: &LayerConfig, num_cols: i64) -> i64 {
     // Assign the result
     let out_shape = &layer_config.out_shapes[0];
-    assert_eq!(out_shape.len(), 2);
+    println!("out_shape: {:?}", out_shape);
+
+    // assert_eq!(out_shape.len(), 2);
+    
     let out_size = out_shape.iter().product::<usize>() as i64;
     let mut num_rows = out_size.div_ceil(num_cols);
 
-    // r1 * result
+    // // r1 * result
     num_rows +=
-      <FCRLCVarDivLookupChip<F> as Layer<F>>::num_rows_dot_acc(out_shape[0] as i64, num_cols)
-        * (out_shape[1] as i64);
+      (<FCRLCVarDivLookupChip<F> as Layer<F>>::num_rows_dot_acc(out_shape[0] as i64, num_cols)
+        * (out_shape[1] as i64)) / 2;
     // r1 * result * r2
     num_rows +=
-      <FCRLCVarDivLookupChip<F> as Layer<F>>::num_rows_dot_acc(out_shape[1] as i64, num_cols);
+      (<FCRLCVarDivLookupChip<F> as Layer<F>>::num_rows_dot_acc(out_shape[1] as i64, num_cols)) / 2;
 
     // r1 * input
     let inp_shape = &layer_config.inp_shapes[0];
@@ -245,20 +248,21 @@ impl<F: PrimeField> Layer<F> for FCRLCVarDivLookupChip<F> {
     };
     num_rows +=
       <FCRLCVarDivLookupChip<F> as Layer<F>>::num_rows_dot_acc(inp_shape[0] as i64, num_cols)
-        * (inp_shape[1] as i64);
+        * (inp_shape[1] as i64) / 2;
 
-    let weight_shape = &layer_config.inp_shapes[1];
-    num_rows +=
-      <FCRLCVarDivLookupChip<F> as Layer<F>>::num_rows_dot_acc(weight_shape[0] as i64, num_cols)
-        * (weight_shape[1] as i64);
+    // let weight_shape = &layer_config.inp_shapes[1];
+    // num_rows +=
+    //   <FCRLCVarDivLookupChip<F> as Layer<F>>::num_rows_dot_acc(weight_shape[0] as i64, num_cols)
+    //     * (weight_shape[1] as i64);
 
     // (r1 * input) * (weight * r2)
     num_rows +=
-      <FCRLCVarDivLookupChip<F> as Layer<F>>::num_rows_dot_acc(inp_shape[1] as i64, num_cols);
+      <FCRLCVarDivLookupChip<F> as Layer<F>>::num_rows_dot_acc(inp_shape[1] as i64, num_cols) / 2;
 
+      // println!("{:?}"
     // Normalization
     if self.config.normalize {
-      let num_divs_per_row = (num_cols - 1) / 3;
+      let num_divs_per_row = (num_cols - 1) / 4;
       let num_rows_for_div = out_size.div_ceil(num_divs_per_row);
       num_rows += num_rows_for_div;
 
