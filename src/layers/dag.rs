@@ -1,6 +1,7 @@
-use std::{collections::HashMap, fs::File, io::BufWriter, marker::PhantomData, rc::Rc};
+use std::{collections::{HashMap, BTreeMap}, fs::File, io::BufWriter, marker::PhantomData, rc::Rc};
 
-use halo2_proofs::{circuit::Layouter, halo2curves::ff::PrimeField, plonk::Error};
+use halo2_proofs::{circuit::{Layouter, Value}, halo2curves::ff::PrimeField, plonk::{Error, MatrixConfig, Advice, Column, Assigned}};
+use ndarray::{Array, IxDyn};
 
 use crate::{
   gadgets::gadget::{convert_to_u64, GadgetConfig},
@@ -28,7 +29,7 @@ use crate::{
     tanh::TanhChip,
     update::UpdateChip,
   },
-  utils::helpers::print_assigned_arr,
+  utils::helpers::print_assigned_arr, model::MatrixLog,
 };
 
 use super::{
@@ -50,6 +51,64 @@ pub struct DAGLayerChip<F: PrimeField + Ord> {
   _marker: PhantomData<F>,
 }
 
+// You turn each of the matmul assignments into a 'ticket' that we store for later processing
+pub struct MatmulAssignment<F: PrimeField + Ord> {
+  width: usize,
+  height: usize,
+  tensor: Vec<Vec<F>>,
+  input_vec: Vec<CellRc<F>>,
+  output_vec: Vec<CellRc<F>>, 
+}
+
+/// The vector 
+/// We also want to actually 
+pub struct VectorEngine<F: PrimeField + Ord> {
+  assignments: HashMap<MatrixConfig, Vec<MatmulAssignment<F>>>,
+}
+
+/// The final matrix
+pub struct MatrixOutput<F: PrimeField + Ord> {
+  /// stacked input vector
+  input_vector: Vec<CellRc<F>>,
+  /// Accumulated output vector
+  output_vector: Vec<CellRc<F>>,
+  /// stacked tensor
+  tensor: Vec<Vec<F>>,
+}
+
+impl<F: PrimeField + Ord> VectorEngine<F> {
+  // So right now, for our batchmul thing, we are essentially doing a gate where we compute the frievalded output. Right now, we do a batch size
+  // 1. Create the frievalds' ready
+  // 
+  fn assign_matmul(
+    &mut self,
+    matrix_log: &MatrixLog,
+    input_vec: Vec<CellRc<F>>,
+  ) {
+    panic!("not implemented");
+  }
+
+  pub fn generate_column_assignments() -> Vec<MatrixOutput<F>> {
+    panic!("not implemented");
+  }
+}
+
+// impl<F: PrimeField + Ord> MatrixOutput<F> {
+//   // So after we've aggregated all the stuff, we can now finally assign our matrices
+//   fn assign_matrix_output(
+//     &self,
+//     mut layouter: impl Layouter<F>,
+//   ) -> Result<(), Error> {
+//     layouter.assign_region("region", ||)
+//     Ok(())
+//   }
+// }
+
+pub enum TensorAssignedOrUnassigned<F: PrimeField + Ord> {
+  Unassigned(Array<F, IxDyn>),
+  Assigned(AssignedTensor<F>)
+}
+
 impl<F: PrimeField + Ord> DAGLayerChip<F> {
   pub fn construct(dag_config: DAGLayerConfig) -> Self {
     Self {
@@ -58,35 +117,191 @@ impl<F: PrimeField + Ord> DAGLayerChip<F> {
     }
   }
 
+  // A less efficient version of assigning tensors
+  // Note: For our commitments, you should create fixed 'tensor columns'
+  // and use the commitments to those (with a constant blinding factor)
+  // as the commitment. Also note how you can do the fast commitments.
+  pub fn assign_tensor_map(
+    &self,
+    mut layouter: impl Layouter<F>,
+    columns: &Vec<Column<Advice>>,
+    tensor: Array<F, IxDyn>,
+  ) -> Result<AssignedTensor<F>, Error> {
+    let tensors = layouter.assign_region(
+      || "asssignment",
+      |mut region| {
+        let mut cell_idx = 0;
+
+        let mut flat = vec![];
+        for val in tensor.iter() {
+          let row_idx = cell_idx / columns.len();
+          let col_idx = cell_idx % columns.len();
+          let cell = region
+            .assign_advice(
+              || "assignment",
+              columns[col_idx],
+              row_idx,
+              || Value::known(*val),
+            )
+            .unwrap();
+          flat.push(Rc::new(cell));
+          cell_idx += 1;
+        }
+        let tensor = Array::from_shape_vec(tensor.shape(), flat).unwrap();
+
+        Ok(tensor)
+      },
+    )?;
+
+    Ok(tensors)
+  }
+
+  pub fn assign_tensors_map(
+    &self,
+    mut layouter: impl Layouter<F>,
+    columns: &Vec<Column<Advice>>,
+    tensors: &BTreeMap<i64, Array<F, IxDyn>>,
+  ) -> Result<BTreeMap<i64, AssignedTensor<F>>, Error> {
+    let tensors = layouter.assign_region(
+      || "asssignment",
+      |mut region| {
+        let mut cell_idx = 0;
+        let mut assigned_tensors = BTreeMap::new();
+
+        for (tensor_idx, tensor) in tensors.iter() {
+          let mut flat = vec![];
+          for val in tensor.iter() {
+            let row_idx = cell_idx / columns.len();
+            let col_idx = cell_idx % columns.len();
+            let cell = region
+              .assign_advice(
+                || "assignment",
+                columns[col_idx],
+                row_idx,
+                || Value::known(*val),
+              )
+              .unwrap();
+            flat.push(Rc::new(cell));
+            cell_idx += 1;
+          }
+          let tensor = Array::from_shape_vec(tensor.shape(), flat).unwrap();
+          assigned_tensors.insert(*tensor_idx, tensor);
+        }
+
+        Ok(assigned_tensors)
+      },
+    )?;
+
+    Ok(tensors)
+  }
+
+  pub fn tensor_map_to_vec(
+    &self,
+    tensor_map: &BTreeMap<i64, Array<CellRc<F>, IxDyn>>,
+  ) -> Result<Vec<AssignedTensor<F>>, Error> {
+    let smallest_tensor = tensor_map
+      .iter()
+      .min_by_key(|(_, tensor)| tensor.len())
+      .unwrap()
+      .1;
+    let max_tensor_key = tensor_map
+      .iter()
+      .max_by_key(|(key, _)| *key)
+      .unwrap()
+      .0
+      .clone();
+    let mut tensors = vec![];
+    for i in 0..max_tensor_key + 1 {
+      let tensor = tensor_map.get(&i).unwrap_or(smallest_tensor);
+      tensors.push(tensor.clone());
+    }
+
+    Ok(tensors)
+  }
+
+  pub fn assign_tensors_vec(
+    &self,
+    mut layouter: impl Layouter<F>,
+    columns: &Vec<Column<Advice>>,
+    tensors: &BTreeMap<i64, Array<F, IxDyn>>,
+  ) -> Result<Vec<AssignedTensor<F>>, Error> {
+    let tensor_map = self
+      .assign_tensors_map(
+        layouter.namespace(|| "assign_tensors_map"),
+        columns,
+        tensors,
+      )
+      .unwrap();
+    self.tensor_map_to_vec(&tensor_map)
+  }
+
+  // Initialize a tensor map with unassigned tensors
+  pub fn initialized_unassigned_tensors_map(
+    &self,
+    tensors: &BTreeMap<i64, Array<F, IxDyn>>,
+  ) -> HashMap<usize, TensorAssignedOrUnassigned<F>> {
+    tensors.iter().map(|(&ix, x)| (ix as usize, TensorAssignedOrUnassigned::Unassigned(x.clone()))).collect::<HashMap<usize, _>>()
+  }
+
   // IMPORTANT: Assumes input tensors are in order. Output tensors can be in any order.
   pub fn forward(
     &self,
     mut layouter: impl Layouter<F>,
-    tensors: &Vec<AssignedTensor<F>>,
+    tensors: &BTreeMap<i64, Array<F, IxDyn>>,
     constants: &HashMap<i64, CellRc<F>>,
     gadget_config: Rc<GadgetConfig>,
     _layer_config: &LayerConfig,
   ) -> Result<(HashMap<usize, AssignedTensor<F>>, Vec<AssignedTensor<F>>), Error> {
-    // Tensor map
-    let mut tensor_map = HashMap::new();
-    for (idx, tensor) in tensors.iter().enumerate() {
-      tensor_map.insert(idx, tensor.clone());
-    }
+    // We only assign things in the tensor when we do not use them as weights.
+
+    // let tensors = self.assign_tensors_vec(
+    //   layouter.namespace(|| "assignment"),
+    //   &gadget_config.columns,
+    //   &tensors,
+    // ).unwrap();
+
+    let tensor_map = self.initialized_unassigned_tensors_map(tensors);
 
     // Compute the dag
     for (layer_idx, layer_config) in self.dag_config.ops.iter().enumerate() {
       let layer_type = &layer_config.layer_type;
       let inp_idxes = &self.dag_config.inp_idxes[layer_idx];
       let out_idxes = &self.dag_config.out_idxes[layer_idx];
+
       println!(
         "Processing layer {}, type: {:?}, inp_idxes: {:?}, out_idxes: {:?}, layer_params: {:?}",
         layer_idx, layer_type, inp_idxes, out_idxes, layer_config.layer_params
       );
-      let vec_inps = inp_idxes
+      let raw_vec_inps = inp_idxes
         .iter()
         .map(|idx| tensor_map.get(idx).unwrap().clone())
         .collect::<Vec<_>>();
+      
+      // We try to assign all the vec inputs. Convert some things into fixed
+      // tensors before we pass it through the compiler
+      let mut vec_inps = vec![];
+      // ZKML TODO: This is a decently pretty bad software architecture choice?
+      // Probably is a cleaner way to do this.
+      let mut flex_vec_inps = vec![];
+      for (ix, &raw_inp) in raw_vec_inps.iter().enumerate() {
+        // If we are in a "weights" section, then we will 
+        if layer_type == &LayerType::Conv2D && ix == 2 {
 
+        } else {
+
+        }
+        match raw_inp {
+          &TensorAssignedOrUnassigned::Unassigned(inp) => {
+            // Convert the vector to an assigned vector
+
+          },
+          &TensorAssignedOrUnassigned::Assigned(inp) => {
+            vec_inps.push(inp);
+          }
+        }
+        
+      }
+      
       let out = match layer_type {
         LayerType::Add => {
           let add_chip = AddChip {};
@@ -432,7 +647,6 @@ impl<F: PrimeField + Ord> DAGLayerChip<F> {
         println!("Out {} shape: {:?}", idx, out[idx].shape());
         tensor_map.insert(*tensor_idx, out[idx].clone());
       }
-      println!();
     }
 
     let mut final_out = vec![];

@@ -234,10 +234,10 @@ impl<F: PrimeField> Layer<F> for FCRLCVarDivLookupChip<F> {
     // // r1 * result
     num_rows +=
       (<FCRLCVarDivLookupChip<F> as Layer<F>>::num_rows_dot_acc(out_shape[0] as i64, num_cols)
-        * (out_shape[1] as i64));
+        * (out_shape[1] as i64)) / 2;
     // r1 * result * r2
     num_rows +=
-      (<FCRLCVarDivLookupChip<F> as Layer<F>>::num_rows_dot_acc(out_shape[1] as i64, num_cols));
+      (<FCRLCVarDivLookupChip<F> as Layer<F>>::num_rows_dot_acc(out_shape[1] as i64, num_cols)) / 2;
 
     // r1 * input
     let inp_shape = &layer_config.inp_shapes[0];
@@ -248,16 +248,16 @@ impl<F: PrimeField> Layer<F> for FCRLCVarDivLookupChip<F> {
     };
     num_rows +=
       <FCRLCVarDivLookupChip<F> as Layer<F>>::num_rows_dot_acc(inp_shape[0] as i64, num_cols)
-        * (inp_shape[1] as i64);
+        * (inp_shape[1] as i64) / 2;
 
-    let weight_shape = &layer_config.inp_shapes[1];
-    num_rows +=
-      <FCRLCVarDivLookupChip<F> as Layer<F>>::num_rows_dot_acc(weight_shape[0] as i64, num_cols)
-        * (weight_shape[1] as i64);
+    // let weight_shape = &layer_config.inp_shapes[1];
+    // num_rows +=
+    //   <FCRLCVarDivLookupChip<F> as Layer<F>>::num_rows_dot_acc(weight_shape[0] as i64, num_cols)
+    //     * (weight_shape[1] as i64);
 
     // (r1 * input) * (weight * r2)
     num_rows +=
-      <FCRLCVarDivLookupChip<F> as Layer<F>>::num_rows_dot_acc(inp_shape[1] as i64, num_cols);
+      <FCRLCVarDivLookupChip<F> as Layer<F>>::num_rows_dot_acc(inp_shape[1] as i64, num_cols) / 2;
 
       // println!("{:?}"
     // Normalization

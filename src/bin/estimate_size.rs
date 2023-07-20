@@ -46,17 +46,22 @@ fn main() {
   let mut num_rows = circuit.num_random;
 
   // Number of rows from assignment
+  // println!("tensors {:?}", circuit.tensors);
   let mut total_tensor_size = 0;
-  for (_, tensor) in circuit.tensors.iter() {
-    let num_elem = tensor.shape().iter().product::<usize>();
-    total_tensor_size += num_elem;
-  }
+  // for (_, tensor) in circuit.tensors.iter() {
+  //   println!("in tensor {:?}", tensor);
+  //   let num_elem = tensor.shape().iter().product::<usize>();
+  //   total_tensor_size += num_elem;
+  // }
+  // println!("TOTAL TENSOR {:?}")
 
   num_rows += (total_tensor_size as i64).div_ceil(num_cols);
   println!("Total tensor + random size: {}", total_tensor_size);
   println!("Total rows for assignment: {}", num_rows);
 
   let mut hash_map = HashMap::new();
+
+  println!("NUM ROWS BEFORE {:?}", num_rows);
 
   // Number of rows from layers
   for layer_config in circuit.dag_config.ops.iter() {

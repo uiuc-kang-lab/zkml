@@ -160,84 +160,6 @@ pub struct ModelConfig<F: PrimeField + Ord + FromUniformBytes<64>> {
 }
 
 impl<F: PrimeField + Ord + FromUniformBytes<64>> ModelCircuit<F> {
-  pub fn assign_tensors_map(
-    &self,
-    mut layouter: impl Layouter<F>,
-    columns: &Vec<Column<Advice>>,
-    tensors: &BTreeMap<i64, Array<F, IxDyn>>,
-  ) -> Result<BTreeMap<i64, AssignedTensor<F>>, Error> {
-    let tensors = layouter.assign_region(
-      || "asssignment",
-      |mut region| {
-        let mut cell_idx = 0;
-        let mut assigned_tensors = BTreeMap::new();
-
-        for (tensor_idx, tensor) in tensors.iter() {
-          let mut flat = vec![];
-          for val in tensor.iter() {
-            let row_idx = cell_idx / columns.len();
-            let col_idx = cell_idx % columns.len();
-            let cell = region
-              .assign_advice(
-                || "assignment",
-                columns[col_idx],
-                row_idx,
-                || Value::known(*val),
-              )
-              .unwrap();
-            flat.push(Rc::new(cell));
-            cell_idx += 1;
-          }
-          let tensor = Array::from_shape_vec(tensor.shape(), flat).unwrap();
-          assigned_tensors.insert(*tensor_idx, tensor);
-        }
-
-        Ok(assigned_tensors)
-      },
-    )?;
-
-    Ok(tensors)
-  }
-
-  pub fn tensor_map_to_vec(
-    &self,
-    tensor_map: &BTreeMap<i64, Array<CellRc<F>, IxDyn>>,
-  ) -> Result<Vec<AssignedTensor<F>>, Error> {
-    let smallest_tensor = tensor_map
-      .iter()
-      .min_by_key(|(_, tensor)| tensor.len())
-      .unwrap()
-      .1;
-    let max_tensor_key = tensor_map
-      .iter()
-      .max_by_key(|(key, _)| *key)
-      .unwrap()
-      .0
-      .clone();
-    let mut tensors = vec![];
-    for i in 0..max_tensor_key + 1 {
-      let tensor = tensor_map.get(&i).unwrap_or(smallest_tensor);
-      tensors.push(tensor.clone());
-    }
-
-    Ok(tensors)
-  }
-
-  pub fn assign_tensors_vec(
-    &self,
-    mut layouter: impl Layouter<F>,
-    columns: &Vec<Column<Advice>>,
-    tensors: &BTreeMap<i64, Array<F, IxDyn>>,
-  ) -> Result<Vec<AssignedTensor<F>>, Error> {
-    let tensor_map = self
-      .assign_tensors_map(
-        layouter.namespace(|| "assign_tensors_map"),
-        columns,
-        tensors,
-      )
-      .unwrap();
-    self.tensor_map_to_vec(&tensor_map)
-  }
 
   pub fn assign_constants(
     &self,
@@ -399,6 +321,7 @@ impl<F: PrimeField + Ord + FromUniformBytes<64>> ModelCircuit<F> {
     };
 
     let mut tensors = BTreeMap::new();
+    // println!("CONFIG TENSORS {:?}", config);
     for flat in config.tensors {
       let value_flat = flat.data.iter().map(|x| to_field(*x)).collect::<Vec<_>>();
       let shape = flat.shape.iter().map(|x| *x as usize).collect::<Vec<_>>();
@@ -485,6 +408,7 @@ impl<F: PrimeField + Ord + FromUniformBytes<64>> ModelCircuit<F> {
           layer_config
         })
         .collect::<Vec<_>>();
+      
       let inp_idxes = config
         .layers
         .iter()
@@ -528,12 +452,15 @@ impl<F: PrimeField + Ord + FromUniformBytes<64>> ModelCircuit<F> {
       num_rows: (1 << k) - 10 + 1,
       num_cols: config.num_cols as usize,
       used_gadgets: used_gadgets.clone(),
+      weight_tensors: config.weight_tensors.clone().unwrap_or(vec![]),
       commit_before: config.commit_before.clone().unwrap_or(vec![]),
       commit_after: config.commit_after.clone().unwrap_or(vec![]),
       use_selectors: config.use_selectors.unwrap_or(true),
       num_bits_per_elem: config.bits_per_elem.unwrap_or(k as i64),
       ..cloned_gadget
     };
+
+    println!("Weight tensors {:?}", gadget.lock().unwrap().weight_tensors.clone());
 
     ModelCircuit {
       tensors,
@@ -808,64 +735,69 @@ impl<F: PrimeField + Ord + FromUniformBytes<64>> Circuit<F> for ModelCircuit<F> 
       )
       .unwrap();
 
+
     let mut commitments = vec![];
-    let tensors = if self.commit_before.len() > 0 {
-      // Commit to the tensors before the DAG
-      let mut tensor_map = BTreeMap::new();
-      let mut ignore_idxes: Vec<i64> = vec![];
-      for commit_idxes in self.commit_before.iter() {
-        let to_commit = BTreeMap::from_iter(
-          commit_idxes
-            .iter()
-            .map(|idx| (*idx, self.tensors.get(idx).unwrap().clone())),
-        );
-        let (mut committed_tensors, commitment) = self.assign_and_commit(
-          layouter.namespace(|| "commit"),
-          &constants,
-          &config,
-          &to_commit,
-        );
-        commitments.push(commitment);
-        tensor_map.append(&mut committed_tensors);
-        ignore_idxes.extend(commit_idxes.iter());
-      }
 
-      // Assign the remainder of the tensors
-      let mut assign_map = BTreeMap::new();
-      for (idx, tensor) in self.tensors.iter() {
-        if ignore_idxes.contains(idx) {
-          continue;
-        }
-        assign_map.insert(*idx, tensor.clone());
-      }
-      let mut remainder_tensor_map = self
-        .assign_tensors_map(
-          layouter.namespace(|| "assignment"),
-          &config.gadget_config.columns,
-          &assign_map,
-        )
-        .unwrap();
+    // let tensors = if self.commit_before.len() > 0 {
+    //   // Commit to the tensors before the DAG
+    //   let mut tensor_map = BTreeMap::new();
+    //   let mut ignore_idxes: Vec<i64> = vec![];
+      
+    //   for commit_idxes in self.commit_before.iter() {
+    //     let to_commit = BTreeMap::from_iter(
+    //       commit_idxes
+    //         .iter()
+    //         .map(|idx| (*idx, self.tensors.get(idx).unwrap().clone())),
+    //     );
+    //     let (mut committed_tensors, commitment) = self.assign_and_commit(
+    //       layouter.namespace(|| "commit"),
+    //       &constants,
+    //       &config,
+    //       &to_commit,
+    //     );
+    //     commitments.push(commitment);
+    //     tensor_map.append(&mut committed_tensors);
+    //     ignore_idxes.extend(commit_idxes.iter());
+    //   }
 
-      // Merge the two maps
-      tensor_map.append(&mut remainder_tensor_map);
+    //   // Assign the remainder of the tensors
+    //   let mut assign_map = BTreeMap::new();
+    //   for (idx, tensor) in self.tensors.iter() {
+    //     if ignore_idxes.contains(idx) {
+    //       continue;
+    //     }
+    //     assign_map.insert(*idx, tensor.clone());
+    //   }
+    //   let mut remainder_tensor_map = self
+    //     .assign_tensors_map(
+    //       layouter.namespace(|| "assignment"),
+    //       &config.gadget_config.columns,
+    //       &assign_map,
+    //     )
+    //     .unwrap();
 
-      // Return the tensors
-      self.tensor_map_to_vec(&tensor_map).unwrap()
-    } else {
-      self
-        .assign_tensors_vec(
-          layouter.namespace(|| "assignment"),
-          &config.gadget_config.columns,
-          &self.tensors,
-        )
-        .unwrap()
-    };
+    //   // Merge the two maps
+    //   tensor_map.append(&mut remainder_tensor_map);
+
+    //   // Return the tensors
+    //   self.tensor_map_to_vec(&tensor_map).unwrap()
+    // } else {
+    //   self
+    //     .assign_tensors_vec(
+    //       layouter.namespace(|| "assignment"),
+    //       &config.gadget_config.columns,
+    //       &self.tensors,
+    //     )
+    //     .unwrap()
+    // };
+
+    // We want to only selectively assign the tensors beforehand. We can manage this through our python compiler
 
     // Perform the dag
     let dag_chip = DAGLayerChip::<F>::construct(self.dag_config.clone());
     let (final_tensor_map, result) = dag_chip.forward(
       layouter.namespace(|| "dag"),
-      &tensors,
+      &self.tensors,
       &constants,
       config.gadget_config.clone(),
       &LayerConfig::default(),

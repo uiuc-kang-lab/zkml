@@ -463,6 +463,10 @@ class Converter:
 
     commit_before = []
     commit_after = []
+
+    input_tensors = [inp['index'] for inp in input_details]
+    weight_tensors = [tensor['idx'] for tensor in tensors if tensor['idx'] not in input_tensors]
+
     if self.commit:
       input_tensors = [inp['index'] for inp in input_details]
       weight_tensors = [tensor['idx'] for tensor in tensors if tensor['idx'] not in input_tensors]
@@ -484,6 +488,7 @@ class Converter:
       'use_selectors': self.use_selectors,
       'commit_before': commit_before,
       'commit_after': commit_after,
+      'weight_tensors': weight_tensors,
     }
     print()
     print(d['layers'][-1])

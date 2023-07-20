@@ -33,6 +33,7 @@ pub struct ModelMsgpack {
   pub use_selectors: Option<bool>,
   pub commit_before: Option<Vec<Vec<i64>>>,
   pub commit_after: Option<Vec<Vec<i64>>>,
+  pub weight_tensors: Option<Vec<i64>>,
   pub bits_per_elem: Option<i64>, // Specifically for packing for the commitments
   pub num_random: Option<i64>,
 }

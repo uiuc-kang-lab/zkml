@@ -71,7 +71,14 @@ pub struct LayerConfig {
 }
 
 pub type CellRc<F> = Rc<AssignedCell<F, F>>;
+
+// pub enum AssignedTensor<F: Field> {
+//   // Unassigned(Assigned),
+//   Assigned(CellAssignedTensor<F>)
+// }
+
 pub type AssignedTensor<F> = Array<CellRc<F>, IxDyn>;
+
 // General issue with rust: I'm not sure how to pass named arguments to a trait...
 // Currently, the caller must be aware of the order of the tensors and results
 pub trait Layer<F: PrimeField> {

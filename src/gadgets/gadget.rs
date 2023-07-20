@@ -64,6 +64,7 @@ pub struct GadgetConfig {
   pub use_selectors: bool,
   pub commit_before: Vec<Vec<i64>>,
   pub commit_after: Vec<Vec<i64>>,
+  pub weight_tensors: Vec<i64>,
   pub num_bits_per_elem: i64,
 }
 
