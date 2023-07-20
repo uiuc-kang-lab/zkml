@@ -81,21 +81,21 @@ impl<F: PrimeField> BiasDivRoundRelu6Chip<F> {
     for op_idx in 0..columns.len() / NUM_COLS_PER_OP {
       let offset = op_idx * NUM_COLS_PER_OP;
 
-      // meta.lookup("bias_div_relu6 lookup", |meta| {
-      //   let s = meta.query_selector(selector);
-      //   let mod_res = meta.query_advice(columns[offset + 3], Rotation::cur());
-      //   // Constrains that the modulus \in [0, DIV_VAL)
-      //   // div_val - mod_res \in [0, max_val)
-      //   vec![(s.clone() * (two.clone() * sf.clone() - mod_res), div_lookup)]
-      // });
-
-      meta.cq_lookup(|meta| {
+      meta.lookup("bias_div_relu6 lookup", |meta| {
         let s = meta.query_selector(selector);
         let mod_res = meta.query_advice(columns[offset + 1], Rotation::cur());
         // Constrains that the modulus \in [0, DIV_VAL)
         // div_val - mod_res \in [0, max_val)
-        vec![(s.clone() * (two.clone() * sf.clone() - mod_res), cq_div_lookup)]
+        vec![(s.clone() * (two.clone() * sf.clone() - mod_res), div_lookup)]
       });
+
+      // meta.cq_lookup(|meta| {
+      //   let s = meta.query_selector(selector);
+      //   let mod_res = meta.query_advice(columns[offset + 1], Rotation::cur());
+      //   // Constrains that the modulus \in [0, DIV_VAL)
+      //   // div_val - mod_res \in [0, max_val)
+      //   vec![(s.clone() * (two.clone() * sf.clone() - mod_res), cq_div_lookup)]
+      // });
 
       // meta.lookup("bias_div_relu6 lookup", |meta| {
       //   let s = meta.query_selector(selector);
