@@ -21,8 +21,8 @@ use crate::{
     shape::pad::pad,
   },
 };
-
-use super::layer::{ActivationType, AssignedTensor, GadgetConsumer, Layer, LayerConfig};
+use std::fmt::Debug;
+use super::{layer::{ActivationType, AssignedTensor, GadgetConsumer, Layer, LayerConfig}, dag::{TensorAssignedOrUnassigned, VectorEngine}};
 
 #[derive(Default, Clone, Copy, Eq, PartialEq)]
 pub enum PaddingEnum {
@@ -123,11 +123,12 @@ impl<F: PrimeField> Conv2DChip<F> {
     }
   }
 
-  pub fn splat<G: Clone>(
+  pub fn splat<G: Clone + Debug>(
     &self,
+    weight_tensor: &TensorAssignedOrUnassigned<F>,
     tensors: &Vec<Array<Rc<G>, IxDyn>>,
     zero: Rc<G>,
-  ) -> (Vec<Vec<Rc<G>>>, Vec<Vec<Rc<G>>>, Vec<Rc<G>>) {
+  ) -> (Vec<Vec<Rc<G>>>, Vec<Vec<Rc<G>>>, Vec<Rc<G>>, TensorAssignedOrUnassigned<F>) {
     // assert_eq!(tensors.len(), 3);
     assert!(tensors.len() <= 3);
 
@@ -184,6 +185,33 @@ impl<F: PrimeField> Conv2DChip<F> {
       weight_row_idx += 1;
     }
 
+    // 
+    let weight_tensor = if let TensorAssignedOrUnassigned::Unassigned(weight) = weight_tensor {
+      let mut flattened_weights = vec![];
+      let w = weights.shape()[0];
+      let h = weights.shape()[1]
+              * weights.shape()[2]
+              * weights.shape()[3];
+
+      for chan_out in 0..weights.shape()[0] {
+        weights_cells.push(vec![]);
+        for ci in 0..weights.shape()[1] {
+          for cj in 0..weights.shape()[2] {
+            for ck in 0..weights.shape()[3] {
+              flattened_weights.push(weight[[chan_out, ci, cj, ck]].clone());
+            }
+          }
+        }
+        weight_row_idx += 1;
+      }
+      TensorAssignedOrUnassigned::Unassigned(Array::from_shape_vec(IxDyn(&[w, h]), flattened_weights).unwrap())
+    } else {
+      panic!("Panicking because invalid tensor passed in");
+    };
+
+    // println!("1. weight tensor {:?}", weight_tensor);
+    // println!("2. tensor {:?}", weights_cells);
+
     // (O_H * O_W x inp_channels * C_H * C_W)
     for batch in 0..inp.shape()[0] {
       for i in 0..oh {
@@ -217,7 +245,7 @@ impl<F: PrimeField> Conv2DChip<F> {
       }
     }
 
-    (inp_cells, weights_cells, biases_cells)
+    (inp_cells, weights_cells, biases_cells, weight_tensor.clone())
   }
 
   pub fn splat_depthwise<G: Clone>(
@@ -290,10 +318,12 @@ impl<F: PrimeField> Layer<F> for Conv2DChip<F> {
     &self,
     mut layouter: impl Layouter<F>,
     tensors: &Vec<AssignedTensor<F>>,
+    flex_tensors: &Vec<TensorAssignedOrUnassigned<F>>,
     constants: &HashMap<i64, Rc<AssignedCell<F, F>>>,
     gadget_config: Rc<GadgetConfig>,
     layer_config: &LayerConfig,
-  ) -> Result<Vec<AssignedTensor<F>>, Error> {
+    vector_engine: &mut VectorEngine<F>,
+   ) -> Result<Vec<AssignedTensor<F>>, Error> {
     let conv_config = &Self::param_vec_to_config(self.config.layer_params.clone());
     let zero = constants.get(&0).unwrap();
 
@@ -311,9 +341,12 @@ impl<F: PrimeField> Layer<F> for Conv2DChip<F> {
     );
     let batch_size = inp.shape()[0];
 
-    let (splat_inp, splat_weights, splat_biases) = match conv_config.conv_type {
-      ConvLayerEnum::Conv2D => self.splat(tensors, zero.clone()),
-      ConvLayerEnum::DepthwiseConv2D => self.splat_depthwise(tensors, zero.clone()),
+    let (splat_inp, splat_weights, splat_biases, tensor_weight) = match conv_config.conv_type {
+      ConvLayerEnum::Conv2D => self.splat(&flex_tensors[0], tensors, zero.clone()),
+      ConvLayerEnum::DepthwiseConv2D => {
+        panic!("I am panicking now");
+        // self.splat_depthwise(tensors, zero.clone())
+      },
     };
 
     let outp_flat: Vec<AssignedCell<F, F>> = match conv_config.conv_type {
@@ -331,27 +364,35 @@ impl<F: PrimeField> Layer<F> for Conv2DChip<F> {
           .collect::<Vec<_>>();
 
         let out_channels = weights.shape()[0];
+
         let inp_array =
           Array::from_shape_vec(IxDyn(&vec![batch_size * oh * ow, conv_size]), flattened_inp)
             .unwrap();
+
         let weights_array =
           Array::from_shape_vec(IxDyn(&vec![out_channels, conv_size]), flattened_weights).unwrap();
+
+        // why is it like this? we probably should swap it.
+        // H x C \cdot W x C
+        // -> inp_array
 
         let outp_slice = fc_chip
           .forward(
             layouter.namespace(|| ""),
-            &vec![weights_array, inp_array],
+            &vec![inp_array, weights_array],
+            &vec![tensor_weight.clone()],
             constants,
             gadget_config.clone(),
             layer_config,
+            vector_engine,
           )
           .unwrap();
 
         let outp_flat = outp_slice[0]
-          .t()
-          .into_iter()
+          .iter()
           .map(|x| (**x).clone())
           .collect::<Vec<_>>();
+
         outp_flat
       }
       ConvLayerEnum::DepthwiseConv2D => {
@@ -500,3 +541,4 @@ impl<F: PrimeField> GadgetConsumer for Conv2DChip<F> {
     outp
   }
 }
+

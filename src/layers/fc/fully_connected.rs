@@ -9,7 +9,7 @@ use ndarray::{Array, ArrayView, IxDyn};
 
 use crate::{
   gadgets::gadget::GadgetConfig,
-  layers::{fc::fc_dpb_vdiv_lookup::FCDPBiasVarDivLookupChip, layer::ActivationType},
+  layers::{fc::fc_dpb_vdiv_lookup::FCDPBiasVarDivLookupChip, layer::ActivationType, dag::{TensorAssignedOrUnassigned, VectorEngine}},
   utils::helpers::RAND_START_IDX,
 };
 
@@ -110,13 +110,15 @@ impl<F: PrimeField> FullyConnectedChip<F> {
 
 impl<F: PrimeField> Layer<F> for FullyConnectedChip<F> {
   fn forward(
-    &self,
+   &self,
     layouter: impl Layouter<F>,
     tensors: &Vec<AssignedTensor<F>>,
+    flex_tensors: &Vec<TensorAssignedOrUnassigned<F>>,
     constants: &HashMap<i64, CellRc<F>>,
     gadget_config: Rc<GadgetConfig>,
     layer_config: &LayerConfig,
-  ) -> Result<Vec<AssignedTensor<F>>, Error> {
+    vector_engine: &mut VectorEngine<F>,
+   ) -> Result<Vec<AssignedTensor<F>>, Error> {
     assert!(tensors.len() <= 3);
 
     let implementation = layer_config.implementation_idx;
@@ -126,21 +128,21 @@ impl<F: PrimeField> Layer<F> for FullyConnectedChip<F> {
           config: self.config.clone(),
           _marker: PhantomData,
         };
-        chip.forward(layouter, tensors, constants, gadget_config, layer_config)
+        chip.forward(layouter, tensors, flex_tensors, constants, gadget_config, layer_config, vector_engine)
       }
       1 => {
         let chip = FCDPVarDivLookupChip::<F> {
           config: self.config.clone(),
           _marker: PhantomData,
         };
-        chip.forward(layouter, tensors, constants, gadget_config, layer_config)
+        chip.forward(layouter, tensors, flex_tensors, constants, gadget_config, layer_config, vector_engine)
       }
       2 => {
         let chip = FCDPBiasVarDivLookupChip::<F> {
           config: self.config.clone(),
           _marker: PhantomData,
         };
-        chip.forward(layouter, tensors, constants, gadget_config, layer_config)
+        chip.forward(layouter, tensors, flex_tensors, constants, gadget_config, layer_config, vector_engine)
       }
       _ => panic!("Unsupported implementation"),
     }

@@ -14,7 +14,7 @@ use crate::{
 
 use super::{
   averager::Averager,
-  layer::{AssignedTensor, CellRc, GadgetConsumer, Layer, LayerConfig},
+  layer::{AssignedTensor, CellRc, GadgetConsumer, Layer, LayerConfig}, dag::{TensorAssignedOrUnassigned, VectorEngine},
 };
 
 pub struct AvgPool2DChip {}
@@ -35,7 +35,7 @@ impl<F: PrimeField> Averager<F> for AvgPool2DChip {
     _tensors: &Vec<AssignedTensor<F>>,
     gadget_config: Rc<GadgetConfig>,
     layer_config: &LayerConfig,
-  ) -> Result<AssignedCell<F, F>, Error> {
+   ) -> Result<AssignedCell<F, F>, Error> {
     // FIXME: this needs to be revealed
     let div = layer_config.layer_params[0] * layer_config.layer_params[1];
     let div = F::from(div as u64);
@@ -65,10 +65,12 @@ impl<F: PrimeField> Layer<F> for AvgPool2DChip {
     &self,
     layouter: impl Layouter<F>,
     tensors: &Vec<AssignedTensor<F>>,
+    _flex_tensors: &Vec<TensorAssignedOrUnassigned<F>>,
     constants: &HashMap<i64, CellRc<F>>,
     gadget_config: Rc<GadgetConfig>,
     layer_config: &LayerConfig,
-  ) -> Result<Vec<AssignedTensor<F>>, Error> {
+    vector_engine: &mut VectorEngine<F>,
+   ) -> Result<Vec<AssignedTensor<F>>, Error> {
     let dived = self
       .avg_forward(layouter, tensors, constants, gadget_config, layer_config)
       .unwrap();

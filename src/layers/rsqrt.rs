@@ -1,4 +1,5 @@
 use std::{collections::HashMap, rc::Rc, vec};
+use super::dag::{TensorAssignedOrUnassigned, VectorEngine};
 
 use halo2_proofs::{circuit::Layouter, halo2curves::ff::PrimeField, plonk::Error};
 use ndarray::{Array, IxDyn};
@@ -7,7 +8,6 @@ use crate::gadgets::{
   gadget::{Gadget, GadgetConfig, GadgetType},
   nonlinear::rsqrt::RsqrtGadgetChip,
 };
-
 use super::layer::{AssignedTensor, CellRc, GadgetConsumer, Layer, LayerConfig};
 
 #[derive(Clone, Debug)]
@@ -18,10 +18,12 @@ impl<F: PrimeField> Layer<F> for RsqrtChip {
     &self,
     mut layouter: impl Layouter<F>,
     tensors: &Vec<AssignedTensor<F>>,
+    _flex_tensors: &Vec<TensorAssignedOrUnassigned<F>>,
     constants: &HashMap<i64, CellRc<F>>,
     gadget_config: Rc<GadgetConfig>,
     layer_config: &LayerConfig,
-  ) -> Result<Vec<AssignedTensor<F>>, Error> {
+    vector_engine: &mut VectorEngine<F>,
+   ) -> Result<Vec<AssignedTensor<F>>, Error> {
     let inp = &tensors[0];
     let mut inp_vec = vec![];
 

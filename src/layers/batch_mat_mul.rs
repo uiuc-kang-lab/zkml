@@ -8,7 +8,7 @@ use crate::{
   layers::fc::fully_connected::{FullyConnectedChip, FullyConnectedConfig},
 };
 
-use super::layer::{AssignedTensor, CellRc, GadgetConsumer, Layer, LayerConfig};
+use super::{layer::{AssignedTensor, CellRc, GadgetConsumer, Layer, LayerConfig}, dag::{TensorAssignedOrUnassigned, VectorEngine}};
 
 pub struct BatchMatMulChip {}
 
@@ -17,10 +17,12 @@ impl<F: PrimeField> Layer<F> for BatchMatMulChip {
     &self,
     mut layouter: impl Layouter<F>,
     tensors: &Vec<AssignedTensor<F>>,
+    _flex_tensors: &Vec<TensorAssignedOrUnassigned<F>>,
     constants: &HashMap<i64, CellRc<F>>,
     gadget_config: Rc<GadgetConfig>,
     layer_config: &LayerConfig,
-  ) -> Result<Vec<AssignedTensor<F>>, Error> {
+    vector_engine: &mut VectorEngine<F>,
+   ) -> Result<Vec<AssignedTensor<F>>, Error> {
     let inp1 = &tensors[0];
     let inp2 = &tensors[1];
     println!("inp1: {:?}", inp1.shape());
@@ -68,9 +70,11 @@ impl<F: PrimeField> Layer<F> for BatchMatMulChip {
       let outp_slice = fc_chip.forward(
         layouter.namespace(|| ""),
         &vec![inp1_slice, inp2_slice],
+        &vec![],
         constants,
         gadget_config.clone(),
         &tmp_config,
+        vector_engine,
       )?;
       outp.extend(outp_slice[0].iter().map(|x| x.clone()).collect::<Vec<_>>());
     }

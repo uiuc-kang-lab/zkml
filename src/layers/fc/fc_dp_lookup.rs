@@ -33,7 +33,8 @@ impl<F: PrimeField> Layer<F> for FCRLCVarDivLookupChip<F> {
     constants: &HashMap<i64, CellRc<F>>,
     gadget_config: Rc<GadgetConfig>,
     layer_config: &LayerConfig,
-  ) -> Result<Vec<AssignedTensor<F>>, Error> {
+    vector_engine: &mut VectorEngine<F>,
+   ) -> Result<Vec<AssignedTensor<F>>, Error> {
     let activation = FullyConnectedChip::<F>::get_activation(&layer_config.layer_params);
 
     let input = &tensors[0];
@@ -44,6 +45,7 @@ impl<F: PrimeField> Layer<F> for FCRLCVarDivLookupChip<F> {
       input.index_axis(Axis(0), 0)
     };
     let weight = &tensors[1].t().into_owned();
+
     let zero = constants.get(&0).unwrap().as_ref();
 
     // Compute and assign the result

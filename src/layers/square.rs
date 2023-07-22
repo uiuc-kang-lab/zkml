@@ -1,4 +1,5 @@
 use std::{collections::HashMap, rc::Rc, vec};
+use super::dag::{TensorAssignedOrUnassigned, VectorEngine};
 
 use halo2_proofs::{circuit::Layouter, halo2curves::ff::PrimeField, plonk::Error};
 use ndarray::{Array, IxDyn};
@@ -19,10 +20,12 @@ impl<F: PrimeField> Layer<F> for SquareChip {
     &self,
     mut layouter: impl Layouter<F>,
     tensors: &Vec<AssignedTensor<F>>,
+    _flex_tensors: &Vec<TensorAssignedOrUnassigned<F>>,
     constants: &HashMap<i64, CellRc<F>>,
     gadget_config: Rc<GadgetConfig>,
     _layer_config: &LayerConfig,
-  ) -> Result<Vec<AssignedTensor<F>>, Error> {
+    _vector_engine: &mut VectorEngine<F>,
+   ) -> Result<Vec<AssignedTensor<F>>, Error> {
     assert_eq!(tensors.len(), 1);
 
     let inp = &tensors[0];

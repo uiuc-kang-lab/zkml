@@ -12,6 +12,7 @@ use crate::{
 };
 
 use super::layer::{AssignedTensor, CellRc, GadgetConsumer, Layer, LayerConfig};
+use super::dag::{TensorAssignedOrUnassigned, VectorEngine};
 
 pub struct MaxPool2DChip<F: PrimeField> {
   pub marker: std::marker::PhantomData<F>,
@@ -76,10 +77,12 @@ impl<F: PrimeField> Layer<F> for MaxPool2DChip<F> {
     &self,
     mut layouter: impl Layouter<F>,
     tensors: &Vec<AssignedTensor<F>>,
+    _flex_tensors: &Vec<TensorAssignedOrUnassigned<F>>,
     _constants: &HashMap<i64, CellRc<F>>,
     gadget_config: Rc<GadgetConfig>,
     layer_config: &LayerConfig,
-  ) -> Result<Vec<AssignedTensor<F>>, Error> {
+    vector_engine: &mut VectorEngine<F>,
+   ) -> Result<Vec<AssignedTensor<F>>, Error> {
     let inp = &tensors[0];
     let splat = Self::splat(inp, layer_config).unwrap();
 

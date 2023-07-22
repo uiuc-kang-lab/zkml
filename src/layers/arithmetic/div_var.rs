@@ -13,7 +13,7 @@ use crate::{
     mul_pairs::MulPairsChip,
     var_div::VarDivRoundChip,
   },
-  layers::layer::{AssignedTensor, CellRc, GadgetConsumer, Layer, LayerConfig},
+  layers::{layer::{AssignedTensor, CellRc, GadgetConsumer, Layer, LayerConfig}, dag::TensorAssignedOrUnassigned},
 };
 
 use super::Arithmetic;
@@ -45,9 +45,11 @@ impl<F: PrimeField> Layer<F> for DivVarChip {
     &self,
     mut layouter: impl Layouter<F>,
     tensors: &Vec<AssignedTensor<F>>,
+    _flex_tensors: &Vec<TensorAssignedOrUnassigned<F>>,
     constants: &HashMap<i64, CellRc<F>>,
     gadget_config: Rc<GadgetConfig>,
     _layer_config: &crate::layers::layer::LayerConfig,
+    vector_engine: &mut crate::layers::dag::VectorEngine<F>,
   ) -> Result<Vec<AssignedTensor<F>>, Error> {
     assert_eq!(tensors.len(), 2);
     // TODO: We only support dividing by a single number for now

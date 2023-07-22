@@ -13,7 +13,7 @@ use crate::{
     gadget::{Gadget, GadgetConfig, GadgetType},
     nonlinear::relu::ReluChip,
   },
-  layers::layer::{ActivationType, AssignedTensor, CellRc, GadgetConsumer},
+  layers::{layer::{ActivationType, AssignedTensor, CellRc, GadgetConsumer}, dag::{TensorAssignedOrUnassigned, VectorEngine}},
 };
 
 use super::{
@@ -54,10 +54,12 @@ impl<F: PrimeField> Layer<F> for AddChip {
     &self,
     mut layouter: impl Layouter<F>,
     tensors: &Vec<AssignedTensor<F>>,
+    _flex_tensors: &Vec<TensorAssignedOrUnassigned<F>>,
     constants: &HashMap<i64, CellRc<F>>,
     gadget_config: Rc<GadgetConfig>,
     layer_config: &LayerConfig,
-  ) -> Result<Vec<AssignedTensor<F>>, Error> {
+    vector_engine: &mut VectorEngine<F>,
+   ) -> Result<Vec<AssignedTensor<F>>, Error> {
     let activation = self.get_activation(&layer_config.layer_params);
 
     // Do the addition

@@ -11,6 +11,8 @@ use halo2_proofs::{
 use num_bigint::{BigUint, ToBigUint};
 use num_traits::cast::ToPrimitive;
 
+use crate::model::MatrixLog;
+
 #[derive(Clone, Copy, Debug, Hash, Eq, PartialEq, PartialOrd, Ord)]
 pub enum GadgetType {
   AddPairs,
@@ -66,6 +68,7 @@ pub struct GadgetConfig {
   pub commit_after: Vec<Vec<i64>>,
   pub weight_tensors: Vec<i64>,
   pub num_bits_per_elem: i64,
+  pub matrix_log: MatrixLog,
 }
 
 // TODO: refactor

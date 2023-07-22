@@ -11,19 +11,19 @@ use crate::gadgets::{adder::AdderChip, gadget::GadgetConfig, var_div::VarDivRoun
 
 use super::{
   arithmetic::add::AddChip,
-  layer::{AssignedTensor, CellRc, Layer, LayerConfig},
+  layer::{AssignedTensor, CellRc, Layer, LayerConfig}, dag::TensorAssignedOrUnassigned,
 };
 
 pub trait Averager<F: PrimeField> {
   fn splat(&self, input: &AssignedTensor<F>, layer_config: &LayerConfig) -> Vec<Vec<CellRc<F>>>;
 
   fn get_div_val(
-    &self,
+   &self,
     layouter: impl Layouter<F>,
     tensors: &Vec<AssignedTensor<F>>,
     gadget_config: Rc<GadgetConfig>,
     layer_config: &LayerConfig,
-  ) -> Result<AssignedCell<F, F>, Error>;
+   ) -> Result<AssignedCell<F, F>, Error>;
 
   fn get_num_rows(&self, num_sums: i64, num_inps_per_sum: i64, num_cols: i64) -> i64 {
     // Number of rows from the sum
@@ -46,7 +46,7 @@ pub trait Averager<F: PrimeField> {
     constants: &HashMap<i64, CellRc<F>>,
     gadget_config: Rc<GadgetConfig>,
     layer_config: &LayerConfig,
-  ) -> Result<Vec<CellRc<F>>, Error> {
+   ) -> Result<Vec<CellRc<F>>, Error> {
     // Due to Mean BS
     // assert_eq!(tensors.len(), 1);
     let zero = constants.get(&0).unwrap().as_ref();

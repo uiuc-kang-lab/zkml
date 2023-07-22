@@ -9,7 +9,7 @@ use ndarray::{Array, Axis, IxDyn, Slice};
 
 use crate::{
   gadgets::gadget::GadgetConfig,
-  layers::layer::{AssignedTensor, GadgetConsumer},
+  layers::{layer::{AssignedTensor, GadgetConsumer}, dag::{TensorAssignedOrUnassigned, VectorEngine}},
 };
 
 use super::super::layer::{Layer, LayerConfig};
@@ -74,10 +74,12 @@ impl<F: PrimeField> Layer<F> for PadChip {
     &self,
     _layouter: impl Layouter<F>,
     tensors: &Vec<AssignedTensor<F>>,
+    _flex_tensors: &Vec<TensorAssignedOrUnassigned<F>>,
     constants: &HashMap<i64, Rc<AssignedCell<F, F>>>,
     _gadget_config: Rc<GadgetConfig>,
     layer_config: &LayerConfig,
-  ) -> Result<Vec<AssignedTensor<F>>, Error> {
+    vector_engine: &mut VectorEngine<F>,
+   ) -> Result<Vec<AssignedTensor<F>>, Error> {
     // FIXME: the pad from tflite is actually two, but mine is one
     // assert_eq!(tensors.len(), 1);
     let input = &tensors[0];

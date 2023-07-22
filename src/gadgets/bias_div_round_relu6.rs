@@ -81,21 +81,21 @@ impl<F: PrimeField> BiasDivRoundRelu6Chip<F> {
     for op_idx in 0..columns.len() / NUM_COLS_PER_OP {
       let offset = op_idx * NUM_COLS_PER_OP;
 
-      meta.lookup("bias_div_relu6 lookup", |meta| {
-        let s = meta.query_selector(selector);
-        let mod_res = meta.query_advice(columns[offset + 1], Rotation::cur());
-        // Constrains that the modulus \in [0, DIV_VAL)
-        // div_val - mod_res \in [0, max_val)
-        vec![(s.clone() * (two.clone() * sf.clone() - mod_res), div_lookup)]
-      });
-
-      // meta.cq_lookup(|meta| {
+      // meta.lookup("bias_div_relu6 lookup", |meta| {
       //   let s = meta.query_selector(selector);
       //   let mod_res = meta.query_advice(columns[offset + 1], Rotation::cur());
       //   // Constrains that the modulus \in [0, DIV_VAL)
       //   // div_val - mod_res \in [0, max_val)
-      //   vec![(s.clone() * (two.clone() * sf.clone() - mod_res), cq_div_lookup)]
+      //   vec![(s.clone() * (two.clone() * sf.clone() - mod_res), div_lookup)]
       // });
+
+      meta.cq_lookup(|meta| {
+        let s = meta.query_selector(selector);
+        let mod_res = meta.query_advice(columns[offset + 1], Rotation::cur());
+        // Constrains that the modulus \in [0, DIV_VAL)
+        // div_val - mod_res \in [0, max_val)
+        vec![(s.clone() * (two.clone() * sf.clone() - mod_res), cq_div_lookup)]
+      });
 
       // meta.lookup("bias_div_relu6 lookup", |meta| {
       //   let s = meta.query_selector(selector);
@@ -266,9 +266,10 @@ impl<F: PrimeField> Gadget<F> for BiasDivRoundRelu6Chip<F> {
       inp
         .copy_advice(|| "", region, self.config.columns[offset + 0], row_offset)
         .unwrap();
-      bias
-        .copy_advice(|| "", region, self.config.columns[offset + 1], row_offset)
-        .unwrap();
+
+      // bias
+      //   .copy_advice(|| "", region, self.config.columns[offset + 1], row_offset)
+      //   .unwrap();
 
       // // Assign div_res, mod_res
       // let div_res_cell = region
@@ -283,14 +284,14 @@ impl<F: PrimeField> Gadget<F> for BiasDivRoundRelu6Chip<F> {
       //     },
       //   )
       //   .unwrap();
-      // let _mod_res_cell = region
-      //   .assign_advice(
-      //     || "mod_res",
-      //     self.config.columns[offset + 3],
-      //     row_offset,
-      //     || mod_res.map(|x: i64| F::from(x as u64)),
-      //   )
-      //   .unwrap();
+      let _mod_res_cell = region
+        .assign_advice(
+          || "mod_res",
+          self.config.columns[offset + 1],
+          row_offset,
+          || mod_res.map(|x: i64| F::from(x as u64)),
+        )
+        .unwrap();
 
       let outp_cell = region
         .assign_advice(

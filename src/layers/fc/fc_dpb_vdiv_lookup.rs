@@ -13,7 +13,7 @@ use crate::{
   },
   layers::{
     fc::fully_connected::FullyConnectedChip,
-    layer::{ActivationType, GadgetConsumer, Layer, LayerConfig},
+    layer::{ActivationType, GadgetConsumer, Layer, LayerConfig}, dag::TensorAssignedOrUnassigned,
   },
 };
 
@@ -32,9 +32,11 @@ impl<F: PrimeField> Layer<F> for FCDPBiasVarDivLookupChip<F> {
     &self,
     mut layouter: impl halo2_proofs::circuit::Layouter<F>,
     tensors: &Vec<crate::layers::layer::AssignedTensor<F>>,
+    _flex_tensors: &Vec<TensorAssignedOrUnassigned<F>>,
     constants: &std::collections::HashMap<i64, crate::layers::layer::CellRc<F>>,
     gadget_config: std::rc::Rc<crate::gadgets::gadget::GadgetConfig>,
     layer_config: &crate::layers::layer::LayerConfig,
+    vector_engine: &mut crate::layers::dag::VectorEngine<F>,
   ) -> Result<Vec<crate::layers::layer::AssignedTensor<F>>, halo2_proofs::plonk::Error> {
     let input = &tensors[0];
     let ndim = input.ndim();

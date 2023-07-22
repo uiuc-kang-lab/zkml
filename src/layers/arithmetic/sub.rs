@@ -12,8 +12,7 @@ use crate::{
     gadget::{Gadget, GadgetConfig, GadgetType},
     sub_pairs::SubPairsChip,
   },
-  layers::layer::{AssignedTensor, CellRc, GadgetConsumer},
-};
+  layers::{layer::{AssignedTensor, CellRc, GadgetConsumer}, dag::{TensorAssignedOrUnassigned, VectorEngine}},};
 
 use super::{
   super::layer::{Layer, LayerConfig},
@@ -42,10 +41,12 @@ impl<F: PrimeField> Layer<F> for SubChip {
     &self,
     mut layouter: impl Layouter<F>,
     tensors: &Vec<AssignedTensor<F>>,
+    _flex_tensors: &Vec<TensorAssignedOrUnassigned<F>>,
     constants: &HashMap<i64, CellRc<F>>,
     gadget_config: Rc<GadgetConfig>,
     _layer_config: &LayerConfig,
-  ) -> Result<Vec<AssignedTensor<F>>, Error> {
+    _vector_engine: &mut VectorEngine<F>,
+   ) -> Result<Vec<AssignedTensor<F>>, Error> {
     let (out, out_shape) = self.arithmetic_forward(
       layouter.namespace(|| ""),
       tensors,

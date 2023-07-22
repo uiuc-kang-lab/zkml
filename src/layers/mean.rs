@@ -8,6 +8,7 @@ use halo2_proofs::{
 use ndarray::{Array, Axis, IxDyn};
 
 use crate::gadgets::gadget::{GadgetConfig, GadgetType};
+use super::dag::{TensorAssignedOrUnassigned, VectorEngine};
 
 use super::{
   averager::Averager,
@@ -78,7 +79,7 @@ impl<F: PrimeField> Averager<F> for MeanChip {
     tensors: &Vec<AssignedTensor<F>>,
     gadget_config: Rc<GadgetConfig>,
     layer_config: &LayerConfig,
-  ) -> Result<AssignedCell<F, F>, Error> {
+   ) -> Result<AssignedCell<F, F>, Error> {
     let inp = &tensors[0];
     let keep_axis = self.get_keep_axis(layer_config);
     let mut div = 1;
@@ -109,13 +110,15 @@ impl<F: PrimeField> Averager<F> for MeanChip {
 
 impl<F: PrimeField> Layer<F> for MeanChip {
   fn forward(
-    &self,
+   &self,
     layouter: impl Layouter<F>,
     tensors: &Vec<AssignedTensor<F>>,
+    _flex_tensors: &Vec<TensorAssignedOrUnassigned<F>>,
     constants: &HashMap<i64, CellRc<F>>,
     gadget_config: Rc<GadgetConfig>,
     layer_config: &LayerConfig,
-  ) -> Result<Vec<AssignedTensor<F>>, Error> {
+    vector_engine: &mut VectorEngine<F>,
+   ) -> Result<Vec<AssignedTensor<F>>, Error> {
     let dived = self.avg_forward(layouter, tensors, constants, gadget_config, layer_config)?;
 
     let out_shape = layer_config.out_shapes[0]

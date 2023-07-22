@@ -9,6 +9,8 @@ use ndarray::{Array, IxDyn};
 
 use crate::gadgets::gadget::{GadgetConfig, GadgetType};
 
+use super::dag::{TensorAssignedOrUnassigned, VectorEngine};
+
 #[derive(Clone, Copy, Debug, Default, Hash, Eq, PartialEq)]
 pub enum LayerType {
   Add,
@@ -83,13 +85,15 @@ pub type AssignedTensor<F> = Array<CellRc<F>, IxDyn>;
 // Currently, the caller must be aware of the order of the tensors and results
 pub trait Layer<F: PrimeField> {
   fn forward(
-    &self,
+   &self,
     layouter: impl Layouter<F>,
     tensors: &Vec<AssignedTensor<F>>,
+    flex_tensors: &Vec<TensorAssignedOrUnassigned<F>>,
     constants: &HashMap<i64, CellRc<F>>,
     gadget_config: Rc<GadgetConfig>,
     layer_config: &LayerConfig,
-  ) -> Result<Vec<AssignedTensor<F>>, Error>;
+    vector_engine: &mut VectorEngine<F>,
+   ) -> Result<Vec<AssignedTensor<F>>, Error>;
 
   // The layer config has the input and output sizes (hypothetically...)
   fn num_rows(&self, layer_config: &LayerConfig, num_cols: i64) -> i64;

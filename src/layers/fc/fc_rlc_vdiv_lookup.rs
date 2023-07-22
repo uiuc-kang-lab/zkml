@@ -14,7 +14,7 @@ use crate::{
   },
   layers::{
     fc::fully_connected::FullyConnectedChip,
-    layer::{ActivationType, AssignedTensor, CellRc, GadgetConsumer, Layer, LayerConfig},
+    layer::{ActivationType, AssignedTensor, CellRc, GadgetConsumer, Layer, LayerConfig}, dag::{TensorAssignedOrUnassigned, VectorEngine},
   },
 };
 
@@ -30,23 +30,31 @@ impl<F: PrimeField> Layer<F> for FCRLCVarDivLookupChip<F> {
     &self,
     mut layouter: impl Layouter<F>,
     tensors: &Vec<AssignedTensor<F>>,
+    flex_tensors: &Vec<TensorAssignedOrUnassigned<F>>,
     constants: &HashMap<i64, CellRc<F>>,
     gadget_config: Rc<GadgetConfig>,
     layer_config: &LayerConfig,
+    vector_engine: &mut VectorEngine<F>,
   ) -> Result<Vec<AssignedTensor<F>>, Error> {
     let activation = FullyConnectedChip::<F>::get_activation(&layer_config.layer_params);
 
     let input = &tensors[0];
+
     let ndim = input.ndim();
     let input = if ndim == 2 {
       ArrayView::from(input)
     } else {
       input.index_axis(Axis(0), 0)
     };
+
+    // We probably
     let weight = &tensors[1].t().into_owned();
+    // inp * WEIGHT
+
     let zero = constants.get(&0).unwrap().as_ref();
 
     // Compute and assign the result
+    // Change these to take normal, unassigned tensors
     let mm_result = layouter
       .assign_region(
         || "compute and assign mm",
@@ -55,7 +63,6 @@ impl<F: PrimeField> Layer<F> for FCRLCVarDivLookupChip<F> {
           let mm_result =
             FullyConnectedChip::assign_array(&gadget_config.columns, &mut region, &mm_result)
               .unwrap();
-
           Ok(mm_result)
         },
       )
@@ -71,9 +78,13 @@ impl<F: PrimeField> Layer<F> for FCRLCVarDivLookupChip<F> {
 
     // Compute r1 * result
     let mut r1_res = vec![];
+
+    // r1
+
     // println!("r1_ref: {:?}", r1_ref.len());
     // println!("r2_ref: {:?}", r2_ref.len());
     // println!("mm_result: {:?}", mm_result.shape());
+
     for i in 0..mm_result.shape()[1] {
       let tmp = mm_result.index_axis(Axis(1), i);
       let mm_ci = tmp.iter().collect::<Vec<_>>();
@@ -86,6 +97,8 @@ impl<F: PrimeField> Layer<F> for FCRLCVarDivLookupChip<F> {
         .unwrap();
       r1_res.push(r1_res_i[0].clone());
     }
+
+    // m x n  = m x k \cdot k x n
 
     // Compute r1 * result * r2
     let r1_res_ref = r1_res.iter().collect::<Vec<_>>();
@@ -103,6 +116,7 @@ impl<F: PrimeField> Layer<F> for FCRLCVarDivLookupChip<F> {
     let mut r1_input = vec![];
     // println!("input: {:?}", input.shape());
     // println!("r1_ref: {:?}", r1_ref.len());
+
     for i in 0..input.shape()[1] {
       let tmp = input.index_axis(Axis(1), i);
       let input_ci = tmp.iter().map(|x| x.as_ref()).collect::<Vec<_>>();
@@ -117,6 +131,11 @@ impl<F: PrimeField> Layer<F> for FCRLCVarDivLookupChip<F> {
     }
 
     // Compute weight * r2
+    // weight * r2 = 1d vector
+
+    // I can compute the output of weight * r2 and
+    // and then use frievalds'
+
     let mut weight_r2 = vec![];
     for i in 0..weight.shape()[0] {
       let tmp = weight.index_axis(Axis(0), i);
@@ -131,7 +150,31 @@ impl<F: PrimeField> Layer<F> for FCRLCVarDivLookupChip<F> {
       weight_r2.push(weight_r2_i[0].clone());
     }
 
+    // Accelerate the matrix multiplication if that is possible
+    let tensor = flex_tensors[0].clone();
+    match tensor {
+      TensorAssignedOrUnassigned::Assigned(inp) => {
+        panic!("Assigned tensor");
+      },
+      TensorAssignedOrUnassigned::Unassigned(inp) => {
+        vector_engine.assign_matmul(&gadget_config.matrix_log, &inp.t().into_owned(), &r2_ref, &weight_r2.iter().collect::<Vec<_>>());
+      },
+    }
+
+    // Assign all the matmuls here
+
+    // layouter
+    //   .assign_region(name, |mut region| {
+    //     region.assign_matmul(
+    //       matrix_config,
+    //       input,
+    //       output,
+    //       matrix
+    //     )
+    //   });
+
     // Compute (r1 * input) * (weight * r2)
+    // r2 * input -> and do an equality check
     let r1_input_ref = r1_input.iter().collect::<Vec<_>>();
     let weight_r2_ref = weight_r2.iter().collect::<Vec<_>>();
     let r1_inp_weight_r2 = dot_prod_chip

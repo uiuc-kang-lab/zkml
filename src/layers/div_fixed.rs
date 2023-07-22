@@ -1,4 +1,5 @@
 use std::{collections::HashMap, rc::Rc, vec};
+use super::dag::{TensorAssignedOrUnassigned, VectorEngine};
 
 use halo2_proofs::{
   circuit::{AssignedCell, Layouter, Value},
@@ -24,7 +25,7 @@ impl DivFixedChip {
     _tensors: &Vec<AssignedTensor<F>>,
     gadget_config: Rc<GadgetConfig>,
     layer_config: &LayerConfig,
-  ) -> Result<AssignedCell<F, F>, Error> {
+   ) -> Result<AssignedCell<F, F>, Error> {
     // FIXME: this needs to be revealed
     let div = layer_config.layer_params[0];
     let div = F::from(div as u64);
@@ -55,10 +56,12 @@ impl<F: PrimeField> Layer<F> for DivFixedChip {
     &self,
     mut layouter: impl Layouter<F>,
     tensors: &Vec<AssignedTensor<F>>,
+    _flex_tensors: &Vec<TensorAssignedOrUnassigned<F>>,
     constants: &HashMap<i64, CellRc<F>>,
     gadget_config: Rc<GadgetConfig>,
     layer_config: &LayerConfig,
-  ) -> Result<Vec<AssignedTensor<F>>, Error> {
+    vector_engine: &mut VectorEngine<F>,
+   ) -> Result<Vec<AssignedTensor<F>>, Error> {
     let inp = &tensors[0];
     let inp_flat = inp.iter().map(|x| x.as_ref()).collect::<Vec<_>>();
 

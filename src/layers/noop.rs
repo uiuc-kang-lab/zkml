@@ -5,6 +5,7 @@ use halo2_proofs::{circuit::Layouter, halo2curves::ff::PrimeField, plonk::Error}
 use crate::gadgets::gadget::GadgetConfig;
 
 use super::layer::{AssignedTensor, CellRc, GadgetConsumer, Layer, LayerConfig};
+use super::dag::{TensorAssignedOrUnassigned, VectorEngine};
 
 pub struct NoopChip {}
 
@@ -13,10 +14,12 @@ impl<F: PrimeField> Layer<F> for NoopChip {
     &self,
     _layouter: impl Layouter<F>,
     tensors: &Vec<AssignedTensor<F>>,
+    _flex_tensors: &Vec<TensorAssignedOrUnassigned<F>>,
     _constants: &HashMap<i64, CellRc<F>>,
     _gadget_config: Rc<GadgetConfig>,
     layer_config: &LayerConfig,
-  ) -> Result<Vec<AssignedTensor<F>>, Error> {
+    vector_engine: &mut VectorEngine<F>,
+   ) -> Result<Vec<AssignedTensor<F>>, Error> {
     let ret_idx = layer_config.layer_params[0] as usize;
     Ok(vec![tensors[ret_idx].clone()])
   }

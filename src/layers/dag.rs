@@ -1,6 +1,6 @@
 use std::{collections::{HashMap, BTreeMap}, fs::File, io::BufWriter, marker::PhantomData, rc::Rc};
 
-use halo2_proofs::{circuit::{Layouter, Value}, halo2curves::ff::PrimeField, plonk::{Error, MatrixConfig, Advice, Column, Assigned}};
+use halo2_proofs::{circuit::{Layouter, Value, AssignedCell}, halo2curves::ff::PrimeField, plonk::{Error, MatrixConfig, Advice, Column, Assigned}};
 use ndarray::{Array, IxDyn};
 
 use crate::{
@@ -52,44 +52,129 @@ pub struct DAGLayerChip<F: PrimeField + Ord> {
 }
 
 // You turn each of the matmul assignments into a 'ticket' that we store for later processing
-pub struct MatmulAssignment<F: PrimeField + Ord> {
-  width: usize,
-  height: usize,
-  tensor: Vec<Vec<F>>,
-  input_vec: Vec<CellRc<F>>,
-  output_vec: Vec<CellRc<F>>, 
+#[derive(Debug)]
+pub struct MatmulAssignment<F: PrimeField> {
+  tensor: Array<F, IxDyn>,
+  input_vec: Vec<AssignedCell<F, F>>,
+  output_vec: Vec<AssignedCell<F, F>>,
+}
+
+
+/// The final matrix
+pub struct MatrixOutput<F: PrimeField> {
+  config: MatrixConfig,
+  filled_index: usize,
+  /// stacked input vector
+  input_vector: Vec<AssignedCell<F, F>>,
+  /// output vector to be accumulated
+  output_vectors: Vec<Vec<AssignedCell<F, F>>>,
+  /// stacked tensor
+  tensor: Array<F, IxDyn>,
+}
+
+impl<F: PrimeField> MatrixOutput<F> {
+  /// Create a new cqlin matrix output row
+  pub fn new(config: MatrixConfig) -> Self {
+    let h = 1 << config.l;
+    let w = 1 << config.k;
+    let input_vector = vec![];
+    let output_vectors = vec![];
+    let tensor = Array::from_elem(IxDyn(&[h, w]), F::ZERO);
+
+    MatrixOutput {
+      config,
+      filled_index: 0,
+      input_vector,
+      output_vectors,
+      tensor,
+    }
+  }
+
+  /// Push a new tensor to this row. If the row is true, return false (should create a new row if this is the case)
+  pub fn check_availability(&self, tensor: &Array<F, IxDyn>) -> bool {
+    let ttensor = tensor.t().to_owned();
+    let tensor_h = ttensor.shape()[0];
+
+    if tensor_h + self.filled_index > self.tensor.shape()[0] {
+      false
+    } else {
+    true
+    }
+  }
+
+  pub fn push_tensor(&mut self, tensor: Array<F, IxDyn>, input_vec: Vec<AssignedCell<F, F>>, output_vec: Vec<AssignedCell<F, F>>) -> bool {
+    let ttensor = tensor.t().to_owned();
+    let tensor_h = ttensor.shape()[0];
+    let tensor_w = ttensor.shape()[1];
+
+    for i in 0..tensor_h {
+      for j in 0..tensor_w {
+        self.tensor[[self.filled_index + i, j]] = ttensor[[i, j]];
+      }
+    }
+    self.filled_index += tensor_h;
+
+    self.input_vector.extend(input_vec.into_iter());
+    self.output_vectors.push(output_vec);
+
+    true
+  }
 }
 
 /// The vector 
 /// We also want to actually 
-pub struct VectorEngine<F: PrimeField + Ord> {
-  assignments: HashMap<MatrixConfig, Vec<MatmulAssignment<F>>>,
+pub struct VectorEngine<F: PrimeField> {
+  pub assignments: HashMap<MatrixConfig, Vec<MatmulAssignment<F>>>,
 }
 
-/// The final matrix
-pub struct MatrixOutput<F: PrimeField + Ord> {
-  /// stacked input vector
-  input_vector: Vec<CellRc<F>>,
-  /// Accumulated output vector
-  output_vector: Vec<CellRc<F>>,
-  /// stacked tensor
-  tensor: Vec<Vec<F>>,
-}
-
-impl<F: PrimeField + Ord> VectorEngine<F> {
+impl<F: PrimeField> VectorEngine<F> {
   // So right now, for our batchmul thing, we are essentially doing a gate where we compute the frievalded output. Right now, we do a batch size
   // 1. Create the frievalds' ready
   // 
-  fn assign_matmul(
+  pub fn assign_matmul(
     &mut self,
     matrix_log: &MatrixLog,
-    input_vec: Vec<CellRc<F>>,
+    weight: &Array<F, IxDyn>,
+    input_vec: &Vec<&AssignedCell<F, F>>,
+    output_vec: &Vec<&AssignedCell<F, F>>,
   ) {
-    panic!("not implemented");
+    assert_eq!(input_vec.len(), weight.shape()[1]);
+    assert_eq!(output_vec.len(), weight.shape()[0]);
+
+    let smallest_config = matrix_log.select_log(weight.shape()[0]);
+    let mat_log_vec = self.assignments.entry(smallest_config).or_insert(vec![]);
+    mat_log_vec.push(MatmulAssignment {
+      tensor: weight.clone(),
+      input_vec: input_vec.iter().cloned().cloned().collect::<Vec<_>>(),
+      output_vec: output_vec.iter().cloned().cloned().collect::<Vec<_>>()
+    });
+    println!("MATMUL PROGRESS {:?}", mat_log_vec);
   }
 
-  pub fn generate_column_assignments() -> Vec<MatrixOutput<F>> {
-    panic!("not implemented");
+  pub fn generate_column_assignments(self) -> HashMap<MatrixConfig, Vec<MatrixOutput<F>>> {
+    let mut matrix_outputs = HashMap::new();
+    for (config, assignments) in self.assignments.into_iter() {
+      let mut curr_matrix_output = MatrixOutput::new(config);
+      let mut config_matrix_outputs = vec![];
+
+      for assignment in assignments.into_iter() {
+        let MatmulAssignment {
+          tensor,
+          input_vec,
+          output_vec
+        } = assignment;
+        // If cqlin column unavailable, create a new column.
+        if !curr_matrix_output.check_availability(&tensor) {
+          config_matrix_outputs.push(curr_matrix_output);
+          curr_matrix_output = MatrixOutput::new(config);
+        }
+        curr_matrix_output.push_tensor(tensor, input_vec, output_vec);
+      }
+      config_matrix_outputs.push(curr_matrix_output);
+      matrix_outputs.insert(config, config_matrix_outputs);
+    }
+
+    matrix_outputs
   }
 }
 
@@ -104,8 +189,8 @@ impl<F: PrimeField + Ord> VectorEngine<F> {
 //   }
 // }
 
-#[derive(Clone)]
-pub enum TensorAssignedOrUnassigned<F: PrimeField + Ord> {
+#[derive(Debug, Clone)]
+pub enum TensorAssignedOrUnassigned<F: PrimeField> {
   Unassigned(Array<F, IxDyn>),
   Assigned(AssignedTensor<F>)
 }
@@ -252,7 +337,8 @@ impl<F: PrimeField + Ord> DAGLayerChip<F> {
     constants: &HashMap<i64, CellRc<F>>,
     gadget_config: Rc<GadgetConfig>,
     _layer_config: &LayerConfig,
-  ) -> Result<(HashMap<usize, TensorAssignedOrUnassigned<F>>, Vec<TensorAssignedOrUnassigned<F>>), Error> {
+    vector_engine: &mut VectorEngine<F>,
+   ) -> Result<(HashMap<usize, TensorAssignedOrUnassigned<F>>, Vec<TensorAssignedOrUnassigned<F>>), Error> {
     // We only assign things in the tensor when we do not use them as weights.
 
     // let tensors = self.assign_tensors_vec(
@@ -287,23 +373,24 @@ impl<F: PrimeField + Ord> DAGLayerChip<F> {
       for (ix, raw_inp) in raw_vec_inps.iter().enumerate() {
         // If we are in a "weights" section, then we will 
         // In this case, never assign
-        if layer_type == &LayerType::Conv2D && ix == 10 {
+        if layer_type == &LayerType::Conv2D && ix == 1 {
           flex_vec_inps.push(raw_inp.clone());
-        } else {
-          match raw_inp {
-            TensorAssignedOrUnassigned::Assigned(inp) => {
-              vec_inps.push(inp.clone());
-            },
-            TensorAssignedOrUnassigned::Unassigned(inp) => {
-              // If it is some random component, we replace and send it.
-              let assigned_inp = self.assign_tensor(layouter.namespace(|| ""), &gadget_config.columns, inp)?;
-              // tensor_map.insert(inp_idxes[ix], TensorAssignedOrUnassigned::Assigned(assigned_inp.clone()));
-              vec_inps.push(assigned_inp);
-            }
+        }
+        // } else {
+
+        match raw_inp {
+          TensorAssignedOrUnassigned::Assigned(inp) => {
+            vec_inps.push(inp.clone());
+          },
+          TensorAssignedOrUnassigned::Unassigned(inp) => {
+            // If it is some random component, we replace and send it.
+            let assigned_inp = self.assign_tensor(layouter.namespace(|| ""), &gadget_config.columns, inp)?;
+            tensor_map.insert(inp_idxes[ix], TensorAssignedOrUnassigned::Assigned(assigned_inp.clone()));
+            vec_inps.push(assigned_inp);
           }
         }
 
-        
+        // }
       }
       
       let out = match layer_type {
@@ -312,9 +399,11 @@ impl<F: PrimeField + Ord> DAGLayerChip<F> {
           add_chip.forward(
             layouter.namespace(|| "dag add"),
             &vec_inps,
+            &flex_vec_inps,
             constants,
             gadget_config.clone(),
             &layer_config,
+            vector_engine,
           )?
         }
         LayerType::AvgPool2D => {
@@ -322,9 +411,11 @@ impl<F: PrimeField + Ord> DAGLayerChip<F> {
           avg_pool_2d_chip.forward(
             layouter.namespace(|| "dag avg pool 2d"),
             &vec_inps,
+            &flex_vec_inps,
             constants,
             gadget_config.clone(),
             &layer_config,
+            vector_engine,
           )?
         }
         LayerType::MaxPool2D => {
@@ -334,9 +425,11 @@ impl<F: PrimeField + Ord> DAGLayerChip<F> {
           max_pool_2d_chip.forward(
             layouter.namespace(|| "dag max pool 2d"),
             &vec_inps,
+            &flex_vec_inps,
             constants,
             gadget_config.clone(),
             &layer_config,
+            vector_engine,
           )?
         }
         LayerType::BatchMatMul => {
@@ -344,9 +437,11 @@ impl<F: PrimeField + Ord> DAGLayerChip<F> {
           batch_mat_mul_chip.forward(
             layouter.namespace(|| "dag batch mat mul"),
             &vec_inps,
+            &flex_vec_inps,
             constants,
             gadget_config.clone(),
             &layer_config,
+            vector_engine,
           )?
         }
         LayerType::Broadcast => {
@@ -354,9 +449,11 @@ impl<F: PrimeField + Ord> DAGLayerChip<F> {
           broadcast_chip.forward(
             layouter.namespace(|| "dag batch mat mul"),
             &vec_inps,
+            &flex_vec_inps,
             constants,
             gadget_config.clone(),
             &layer_config,
+            vector_engine,
           )?
         }
         LayerType::Conv2D => {
@@ -367,9 +464,11 @@ impl<F: PrimeField + Ord> DAGLayerChip<F> {
           conv_2d_chip.forward(
             layouter.namespace(|| "dag conv 2d"),
             &vec_inps,
+            &flex_vec_inps,
             constants,
             gadget_config.clone(),
             &layer_config,
+            vector_engine,
           )?
         }
         LayerType::DivFixed => {
@@ -377,9 +476,11 @@ impl<F: PrimeField + Ord> DAGLayerChip<F> {
           div_fixed_chip.forward(
             layouter.namespace(|| "dag div"),
             &vec_inps,
+            &flex_vec_inps,
             constants,
             gadget_config.clone(),
             &layer_config,
+            vector_engine,
           )?
         }
         LayerType::DivVar => {
@@ -387,9 +488,11 @@ impl<F: PrimeField + Ord> DAGLayerChip<F> {
           div_var_chip.forward(
             layouter.namespace(|| "dag div"),
             &vec_inps,
+            &flex_vec_inps,
             constants,
             gadget_config.clone(),
             &layer_config,
+            vector_engine,
           )?
         }
         LayerType::FullyConnected => {
@@ -400,9 +503,11 @@ impl<F: PrimeField + Ord> DAGLayerChip<F> {
           fc_chip.forward(
             layouter.namespace(|| "dag fully connected"),
             &vec_inps,
+            &flex_vec_inps,
             constants,
             gadget_config.clone(),
             &layer_config,
+            vector_engine,
           )?
         }
         LayerType::Softmax => {
@@ -410,9 +515,11 @@ impl<F: PrimeField + Ord> DAGLayerChip<F> {
           softmax_chip.forward(
             layouter.namespace(|| "dag softmax"),
             &vec_inps,
+            &flex_vec_inps,
             constants,
             gadget_config.clone(),
             &layer_config,
+            vector_engine,
           )?
         }
         LayerType::Mean => {
@@ -420,9 +527,11 @@ impl<F: PrimeField + Ord> DAGLayerChip<F> {
           mean_chip.forward(
             layouter.namespace(|| "dag mean"),
             &vec_inps,
+            &flex_vec_inps,
             constants,
             gadget_config.clone(),
             &layer_config,
+            vector_engine,
           )?
         }
         LayerType::Pad => {
@@ -430,9 +539,11 @@ impl<F: PrimeField + Ord> DAGLayerChip<F> {
           pad_chip.forward(
             layouter.namespace(|| "dag pad"),
             &vec_inps,
+            &flex_vec_inps,
             constants,
             gadget_config.clone(),
             &layer_config,
+            vector_engine,
           )?
         }
         LayerType::Permute => {
@@ -440,9 +551,11 @@ impl<F: PrimeField + Ord> DAGLayerChip<F> {
           pad_chip.forward(
             layouter.namespace(|| "dag permute"),
             &vec_inps,
+            &flex_vec_inps,
             constants,
             gadget_config.clone(),
             &layer_config,
+            vector_engine,
           )?
         }
         LayerType::SquaredDifference => {
@@ -450,9 +563,11 @@ impl<F: PrimeField + Ord> DAGLayerChip<F> {
           squared_diff_chip.forward(
             layouter.namespace(|| "dag squared diff"),
             &vec_inps,
+            &flex_vec_inps,
             constants,
             gadget_config.clone(),
             &layer_config,
+            vector_engine,
           )?
         }
         LayerType::Rsqrt => {
@@ -460,9 +575,11 @@ impl<F: PrimeField + Ord> DAGLayerChip<F> {
           rsqrt_chip.forward(
             layouter.namespace(|| "dag rsqrt"),
             &vec_inps,
+            &flex_vec_inps,
             constants,
             gadget_config.clone(),
             &layer_config,
+            vector_engine,
           )?
         }
         LayerType::Sqrt => {
@@ -470,9 +587,11 @@ impl<F: PrimeField + Ord> DAGLayerChip<F> {
           sqrt_chip.forward(
             layouter.namespace(|| "dag sqrt"),
             &vec_inps,
+            &flex_vec_inps,
             constants,
             gadget_config.clone(),
             &layer_config,
+            vector_engine,
           )?
         }
         LayerType::Logistic => {
@@ -480,9 +599,11 @@ impl<F: PrimeField + Ord> DAGLayerChip<F> {
           logistic_chip.forward(
             layouter.namespace(|| "dag logistic"),
             &vec_inps,
+            &flex_vec_inps,
             constants,
             gadget_config.clone(),
             &layer_config,
+            vector_engine,
           )?
         }
         LayerType::Pow => {
@@ -490,9 +611,11 @@ impl<F: PrimeField + Ord> DAGLayerChip<F> {
           pow_chip.forward(
             layouter.namespace(|| "dag logistic"),
             &vec_inps,
-            constants,
+            &flex_vec_inps,
+             constants,
             gadget_config.clone(),
             &layer_config,
+            vector_engine,
           )?
         }
         LayerType::Tanh => {
@@ -500,9 +623,11 @@ impl<F: PrimeField + Ord> DAGLayerChip<F> {
           tanh_chip.forward(
             layouter.namespace(|| "dag tanh"),
             &vec_inps,
-            constants,
+            &flex_vec_inps,
+             constants,
             gadget_config.clone(),
             &layer_config,
+            vector_engine,
           )?
         }
         LayerType::Mul => {
@@ -510,9 +635,11 @@ impl<F: PrimeField + Ord> DAGLayerChip<F> {
           mul_chip.forward(
             layouter.namespace(|| "dag mul"),
             &vec_inps,
-            constants,
+            &flex_vec_inps,
+             constants,
             gadget_config.clone(),
             &layer_config,
+            vector_engine,
           )?
         }
         LayerType::Sub => {
@@ -520,9 +647,11 @@ impl<F: PrimeField + Ord> DAGLayerChip<F> {
           sub_chip.forward(
             layouter.namespace(|| "dag sub"),
             &vec_inps,
-            constants,
+            &flex_vec_inps,
+             constants,
             gadget_config.clone(),
             &layer_config,
+            vector_engine,
           )?
         }
         LayerType::Noop => {
@@ -530,9 +659,11 @@ impl<F: PrimeField + Ord> DAGLayerChip<F> {
           noop_chip.forward(
             layouter.namespace(|| "dag noop"),
             &vec_inps,
-            constants,
+            &flex_vec_inps,
+             constants,
             gadget_config.clone(),
             &layer_config,
+            vector_engine,
           )?
         }
         LayerType::Transpose => {
@@ -540,9 +671,11 @@ impl<F: PrimeField + Ord> DAGLayerChip<F> {
           transpose_chip.forward(
             layouter.namespace(|| "dag transpose"),
             &vec_inps,
-            constants,
+            &flex_vec_inps,
+             constants,
             gadget_config.clone(),
             &layer_config,
+            vector_engine,
           )?
         }
         LayerType::Reshape => {
@@ -550,9 +683,11 @@ impl<F: PrimeField + Ord> DAGLayerChip<F> {
           reshape_chip.forward(
             layouter.namespace(|| "dag reshape"),
             &vec_inps,
-            constants,
+            &flex_vec_inps,
+             constants,
             gadget_config.clone(),
             &layer_config,
+            vector_engine,
           )?
         }
         LayerType::ResizeNN => {
@@ -560,9 +695,11 @@ impl<F: PrimeField + Ord> DAGLayerChip<F> {
           resize_nn_chip.forward(
             layouter.namespace(|| "dag resize nn"),
             &vec_inps,
-            constants,
+            &flex_vec_inps,
+             constants,
             gadget_config.clone(),
             &layer_config,
+            vector_engine,
           )?
         }
         LayerType::Rotate => {
@@ -570,9 +707,11 @@ impl<F: PrimeField + Ord> DAGLayerChip<F> {
           rotate_chip.forward(
             layouter.namespace(|| "dag rotate"),
             &vec_inps,
-            constants,
+            &flex_vec_inps,
+             constants,
             gadget_config.clone(),
             &layer_config,
+            vector_engine,
           )?
         }
         LayerType::Concatenation => {
@@ -580,9 +719,11 @@ impl<F: PrimeField + Ord> DAGLayerChip<F> {
           concat_chip.forward(
             layouter.namespace(|| "dag concatenation"),
             &vec_inps,
-            constants,
+            &flex_vec_inps,
+             constants,
             gadget_config.clone(),
             &layer_config,
+            vector_engine,
           )?
         }
         LayerType::Pack => {
@@ -590,9 +731,11 @@ impl<F: PrimeField + Ord> DAGLayerChip<F> {
           pack_chip.forward(
             layouter.namespace(|| "dag pack"),
             &vec_inps,
-            constants,
+            &flex_vec_inps,
+             constants,
             gadget_config.clone(),
             &layer_config,
+            vector_engine,
           )?
         }
         LayerType::Split => {
@@ -600,9 +743,11 @@ impl<F: PrimeField + Ord> DAGLayerChip<F> {
           split_chip.forward(
             layouter.namespace(|| "dag split"),
             &vec_inps,
-            constants,
+            &flex_vec_inps,
+             constants,
             gadget_config.clone(),
             &layer_config,
+            vector_engine,
           )?
         }
         LayerType::Update => {
@@ -610,9 +755,11 @@ impl<F: PrimeField + Ord> DAGLayerChip<F> {
           split_chip.forward(
             layouter.namespace(|| "dag update"),
             &vec_inps,
-            constants,
+            &flex_vec_inps,
+             constants,
             gadget_config.clone(),
             &layer_config,
+            vector_engine,
           )?
         }
         LayerType::Slice => {
@@ -620,9 +767,11 @@ impl<F: PrimeField + Ord> DAGLayerChip<F> {
           slice_chip.forward(
             layouter.namespace(|| "dag slice"),
             &vec_inps,
-            constants,
+            &flex_vec_inps,
+             constants,
             gadget_config.clone(),
             &layer_config,
+            vector_engine,
           )?
         }
         LayerType::MaskNegInf => {
@@ -630,9 +779,11 @@ impl<F: PrimeField + Ord> DAGLayerChip<F> {
           mask_neg_inf_chip.forward(
             layouter.namespace(|| "dag mask neg inf"),
             &vec_inps,
-            constants,
+            &flex_vec_inps,
+             constants,
             gadget_config.clone(),
             &layer_config,
+            vector_engine,
           )?
         }
         LayerType::Square => {
@@ -640,9 +791,11 @@ impl<F: PrimeField + Ord> DAGLayerChip<F> {
           square_chip.forward(
             layouter.namespace(|| "dag square"),
             &vec_inps,
-            constants,
+            &flex_vec_inps,
+             constants,
             gadget_config.clone(),
             &layer_config,
+            vector_engine,
           )?
         }
       };
@@ -691,6 +844,7 @@ impl<F: PrimeField + Ord> DAGLayerChip<F> {
     // }
 
     Ok((tensor_map, final_out))
+    // Ok(())
   }
 }
 

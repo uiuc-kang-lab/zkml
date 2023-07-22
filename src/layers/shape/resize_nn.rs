@@ -5,8 +5,7 @@ use ndarray::{Array, IxDyn};
 
 use crate::{
   gadgets::gadget::GadgetConfig,
-  layers::layer::{AssignedTensor, CellRc, GadgetConsumer},
-};
+  layers::{layer::{AssignedTensor, CellRc, GadgetConsumer}, dag::{TensorAssignedOrUnassigned, VectorEngine}},};
 
 use super::super::layer::{Layer, LayerConfig};
 
@@ -18,10 +17,12 @@ impl<F: PrimeField> Layer<F> for ResizeNNChip {
     &self,
     _layouter: impl Layouter<F>,
     tensors: &Vec<AssignedTensor<F>>,
+    _flex_tensors: &Vec<TensorAssignedOrUnassigned<F>>,
     _constants: &HashMap<i64, CellRc<F>>,
     _gadget_config: Rc<GadgetConfig>,
     layer_config: &LayerConfig,
-  ) -> Result<Vec<AssignedTensor<F>>, Error> {
+    vector_engine: &mut VectorEngine<F>,
+   ) -> Result<Vec<AssignedTensor<F>>, Error> {
     let inp = &tensors[0];
     let output_shape = layer_config.out_shapes[0].clone();
 

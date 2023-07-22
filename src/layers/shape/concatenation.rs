@@ -5,8 +5,7 @@ use ndarray::{concatenate, Axis};
 
 use crate::{
   gadgets::gadget::{GadgetConfig, GadgetType},
-  layers::layer::{AssignedTensor, CellRc, GadgetConsumer},
-};
+  layers::{layer::{AssignedTensor, CellRc, GadgetConsumer}, dag::{TensorAssignedOrUnassigned, VectorEngine}},};
 
 use super::super::layer::{Layer, LayerConfig};
 
@@ -17,10 +16,12 @@ impl<F: PrimeField> Layer<F> for ConcatenationChip {
     &self,
     _layouter: impl Layouter<F>,
     tensors: &Vec<AssignedTensor<F>>,
+    _flex_tensors: &Vec<TensorAssignedOrUnassigned<F>>,
     _constants: &HashMap<i64, CellRc<F>>,
     _gadget_config: Rc<GadgetConfig>,
     layer_config: &LayerConfig,
-  ) -> Result<Vec<AssignedTensor<F>>, Error> {
+    vector_engine: &mut VectorEngine<F>,
+   ) -> Result<Vec<AssignedTensor<F>>, Error> {
     let axis = layer_config.layer_params[0] as usize;
     let views = tensors.iter().map(|x| x.view()).collect::<Vec<_>>();
     // TODO: this is a bit of a hack

@@ -47,7 +47,7 @@ use crate::{
     avg_pool_2d::AvgPool2DChip,
     batch_mat_mul::BatchMatMulChip,
     conv2d::Conv2DChip,
-    dag::{DAGLayerChip, DAGLayerConfig},
+    dag::{DAGLayerChip, DAGLayerConfig, VectorEngine},
     fc::fully_connected::{FullyConnectedChip, FullyConnectedConfig},
     layer::{AssignedTensor, CellRc, GadgetConsumer, LayerConfig, LayerType},
     logistic::LogisticChip,
@@ -96,7 +96,8 @@ pub struct ModelCircuit<F: PrimeField> {
 /// An object that logs all the matrix widths that are used in the cqlin argument.
 /// Matrix width essentially denotes the maximum width of the matrix
 /// that we can perform cqlin over
-/// 
+
+#[derive(Clone, Debug, Default)]
 pub struct MatrixLog {
   // We likely want to do something that is ordered.
   pub matrices: Vec<MatrixConfig>
@@ -441,6 +442,9 @@ impl<F: PrimeField + Ord + FromUniformBytes<64>> ModelCircuit<F> {
     println!("num_cols {:?}", config.k);
 
     let k = config.k as usize;
+
+    let mut matrix_log = MatrixLog::default();
+    matrix_log.add(MatrixConfig { l: 8, k: 8 });
     
     *gadget.lock().unwrap() = GadgetConfig {
       scale_factor: config.global_sf as u64,
@@ -457,9 +461,9 @@ impl<F: PrimeField + Ord + FromUniformBytes<64>> ModelCircuit<F> {
       commit_after: config.commit_after.clone().unwrap_or(vec![]),
       use_selectors: config.use_selectors.unwrap_or(true),
       num_bits_per_elem: config.bits_per_elem.unwrap_or(k as i64),
+      matrix_log,
       ..cloned_gadget
     };
-
     println!("Weight tensors {:?}", gadget.lock().unwrap().weight_tensors.clone());
 
     ModelCircuit {
@@ -793,6 +797,10 @@ impl<F: PrimeField + Ord + FromUniformBytes<64>> Circuit<F> for ModelCircuit<F> 
 
     // We want to only selectively assign the tensors beforehand. We can manage this through our python compiler
 
+    let mut vector_engine = VectorEngine::<F> {
+      assignments: HashMap::new(),
+    };
+
     // Perform the dag
     let dag_chip = DAGLayerChip::<F>::construct(self.dag_config.clone());
     let (final_tensor_map, _result) = dag_chip.forward(
@@ -801,6 +809,7 @@ impl<F: PrimeField + Ord + FromUniformBytes<64>> Circuit<F> for ModelCircuit<F> 
       &constants,
       config.gadget_config.clone(),
       &LayerConfig::default(),
+      &mut vector_engine,
     )?;
 
     // if self.commit_after.len() > 0 {
