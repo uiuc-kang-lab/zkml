@@ -31,7 +31,10 @@ use crate::{
     max::MaxChip,
     mul_pairs::MulPairsChip,
     nonlinear::{exp::ExpGadgetChip, pow::PowGadgetChip, relu::ReluChip, tanh::TanhGadgetChip},
-    nonlinear::{logistic::LogisticGadgetChip, rsqrt::RsqrtGadgetChip, sqrt::SqrtGadgetChip},
+    nonlinear::{
+      logistic::LogisticGadgetChip, relu_decompose::ReluDecomposeChip, rsqrt::RsqrtGadgetChip,
+      sqrt::SqrtGadgetChip,
+    },
     sqrt_big::SqrtBigChip,
     square::SquareGadgetChip,
     squared_diff::SquaredDiffGadgetChip,
@@ -604,6 +607,7 @@ impl<F: PrimeField + Ord + FromUniformBytes<64>> Circuit<F> for ModelCircuit<F> 
         GadgetType::MulPairs => MulPairsChip::<F>::configure(meta, gadget_config),
         GadgetType::Pow => PowGadgetChip::<F>::configure(meta, gadget_config),
         GadgetType::Relu => ReluChip::<F>::configure(meta, gadget_config),
+        GadgetType::ReluDecompose => ReluDecomposeChip::<F>::configure(meta, gadget_config),
         GadgetType::Rsqrt => RsqrtGadgetChip::<F>::configure(meta, gadget_config),
         GadgetType::Sqrt => SqrtGadgetChip::<F>::configure(meta, gadget_config),
         GadgetType::SqrtBig => SqrtBigChip::<F>::configure(meta, gadget_config),
@@ -683,6 +687,10 @@ impl<F: PrimeField + Ord + FromUniformBytes<64>> Circuit<F> for ModelCircuit<F> 
         GadgetType::Relu => {
           let chip = ReluChip::<F>::construct(gadget_rc.clone());
           chip.load_lookups(layouter.namespace(|| "relu lookup"))?;
+        }
+        GadgetType::ReluDecompose => {
+          let chip = ReluDecomposeChip::<F>::construct(gadget_rc.clone());
+          chip.load_lookups(layouter.namespace(|| "relu decompose lookup"))?;
         }
         GadgetType::Rsqrt => {
           let chip = RsqrtGadgetChip::<F>::construct(gadget_rc.clone());

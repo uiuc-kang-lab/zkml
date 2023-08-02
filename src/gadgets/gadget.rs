@@ -24,6 +24,7 @@ pub enum GadgetType {
   Max,
   Pow,
   Relu,
+  ReluDecompose,
   Rsqrt,
   Sqrt,
   SqrtBig,

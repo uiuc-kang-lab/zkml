@@ -409,6 +409,7 @@ impl<F: PrimeField> Layer<F> for Conv2DChip<F> {
     } else if conv_config.activation == ActivationType::Relu {
       let dived = outp.iter().skip(1).step_by(2).collect::<Vec<_>>();
       let relu_chip = ReluChip::<F>::construct(gadget_config.clone());
+      // let relu_chip = ReluDecomposeChip::<F>::construct(gadget_config.clone());
       let relu_outp = relu_chip
         .forward(layouter.namespace(|| "relu"), &vec![dived], &tmp)
         .unwrap();
