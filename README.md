@@ -48,7 +48,7 @@ expects. Currently, we accept TFLite models. We show an example below.
 
 3. You will need to convert the model:
 ```bash
-python ../../python/converter.py --model model.tflite --model_output converted_model.msgpack --config_output config.msgpack --scale_factor 512 --k 17 --num_cols 10 --num_randoms 1024
+python ../../python/converter.py --model model.tflite --model_output converted_model.msgpack --config_output config.msgpack --scale_factor 512 --k 20 --num_cols 10 --num_randoms 1024
 ```
 
 There are several parameters that need to be changed depending on the model (`scale_factor`, `k`,
@@ -78,3 +78,6 @@ cd ../../
 
 If you're interested in extending or using zkml, please contact us at `ddkang
 [at] g.illinois.edu`.
+
+srun --partition=eng-research --time=12:00:00 --nodes=1 --
+ntasks-per-node=16 --pty /bin/bash

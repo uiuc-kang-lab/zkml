@@ -224,7 +224,7 @@ impl<F: PrimeField> Layer<F> for FCRLCVarDivLookupChip<F> {
   fn num_rows(&self, layer_config: &LayerConfig, num_cols: i64) -> i64 {
     // Assign the result
     let out_shape = &layer_config.out_shapes[0];
-    assert_eq!(out_shape.len(), 2);
+    //assert_eq!(out_shape.len(), 2);
     let out_size = out_shape.iter().product::<usize>() as i64;
     let mut num_rows = out_size.div_ceil(num_cols);
 
