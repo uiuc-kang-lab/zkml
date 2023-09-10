@@ -1,4 +1,5 @@
 #![feature(int_roundings)]
+use std::fmt::format;
 use std::fs::File;
 use std::io::{Error, Write};
 use std::marker::PhantomData;
@@ -157,6 +158,8 @@ fn main() -> Result<(), Error> {
   let config_fname = std::env::args().nth(1).expect("config file path");
   let inp_fname = std::env::args().nth(2).expect("input file path");
   let kzg_or_ipa = std::env::args().nth(3).expect("kzg or ipa");
+
+  let model_name_wo_ext = config_fname.split(".").collect::<Vec<&str>>()[0];
 
   if kzg_or_ipa != "kzg" && kzg_or_ipa != "ipa" {
     panic!("Must specify kzg or ipa");
@@ -350,7 +353,7 @@ fn main() -> Result<(), Error> {
   let time_cost = cost_estimator(num_rows as u64, num_instance, num_advice, num_lookup, num_permutation, max_degree, kzg_or_ipa);
   let k = (num_rows as f32).log2().ceil() as i64;
   
-  let path = "k.tmp";
+  let path = format!("{model_name_wo_ext}_k.tmp");
   let mut output = File::create(path)?;
   write!(output, "{}", k)?;
   
