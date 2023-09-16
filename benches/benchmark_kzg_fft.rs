@@ -13,7 +13,7 @@ use rand_core::OsRng;
 
 pub fn bench_kzg_fft(c: &mut Criterion) {
   let mut group = c.benchmark_group("kzg_fft");
-  for k in 17..18 {
+  for k in 15..28 {
     group.bench_function(BenchmarkId::new("k", k), |b| {
       let mut a = (0..(1 << k)).map(|_| Fr::random(OsRng)).collect::<Vec<_>>();
       let omega = Fr::random(OsRng);

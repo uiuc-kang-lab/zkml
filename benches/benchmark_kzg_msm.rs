@@ -3,24 +3,23 @@ extern crate criterion;
 extern crate rand_core;
 extern crate group;
 use ff::Field;
-use group::prime::PrimeCurveAffine;
 use criterion::{BenchmarkId, Criterion};
 
 use halo2_proofs::{
-    halo2curves::bn256::G1Affine,
+    halo2curves::bn256::{G1Affine, Fr},
     arithmetic::best_multiexp,
 };
 use rand_core::OsRng;
 
 pub fn bench_kzg_multiexp(c: &mut Criterion) {
-    let mut group = c.benchmark_group("kzg_msm");
+    let mut group = c.benchmark_group("msm");
     
-    for k in 17..18 {
+    for k in 15..28 {
         let size = 1 << k;
         let mut rng = OsRng;
 
-        let multiexp_scalars: Vec<<G1Affine as PrimeCurveAffine>::Scalar> = (0..size)
-                .map(|_| <G1Affine as PrimeCurveAffine>::Scalar::random(&mut rng))
+        let multiexp_scalars: Vec<Fr> = (0..size)
+                .map(|_| Fr::random(&mut rng))
                 .collect();
         let multiexp_bases: Vec<G1Affine> = (0..size)
                 .map(|_| G1Affine::random(&mut rng))

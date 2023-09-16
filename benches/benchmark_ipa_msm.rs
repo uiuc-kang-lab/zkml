@@ -14,7 +14,7 @@ use rand_core::OsRng;
 pub fn bench_ipa_multiexp(c: &mut Criterion) {
     let mut group = c.benchmark_group("ipa_msm");
     
-    for k in 17..18 {
+    for k in 15..28 {
         let size = 1 << k;
         let mut rng = OsRng;
 
