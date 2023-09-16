@@ -59,3 +59,19 @@ harness = false
 [[bench]]
 name = "benchmark_kzg_msm"
 harness = false
+
+[[bench]]
+name = "benchmark_kzg_mul"
+harness = false
+
+[[bench]]
+name = "benchmark_ipa_mul"
+harness = false
+
+[[bench]]
+name = "benchmark_kzg_permute_expression_pair"
+harness = false
+
+[[bench]]
+name = "benchmark_ipa_permute_expression_pair"
+harness = false
