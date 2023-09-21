@@ -12,7 +12,7 @@ use halo2_proofs::{
 use rand_core::OsRng;
 
 pub fn bench_kzg_multiexp(c: &mut Criterion) {
-    let mut group = c.benchmark_group("msm");
+    let mut group = c.benchmark_group("kzg_msm");
     
     for k in 15..28 {
         let size = 1 << k;

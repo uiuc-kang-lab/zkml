@@ -67,7 +67,7 @@ fn simulate_permute_expression_pair(k: i32) -> Result<vesta::Scalar, Error> {
 }
 
 pub fn bench_ipa_permute_expression_pair(c: &mut Criterion) {
-    let mut group = c.benchmark_group("ipa_msm");
+    let mut group = c.benchmark_group("ipa_permute");
     
     for k in 15..28 {
         group.bench_function(BenchmarkId::new("k", k), |b| {
