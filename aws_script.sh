@@ -1,12 +1,3 @@
-# Install Rust stuff
-curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
-rustup override set nightly
-
-# Install Gdown
-pip install gdown
-mkdir examples/benchmark
-gdown https://drive.google.com/drive/folders/1OTMmxUKR8hzWTSOZlj3JBgWSuc3RKF8x -O ./examples/benchmark --folder
-
 # Cargo build
 cargo build --release
 ./target/release/time_circuit examples/benchmark/converted_model_20.msgpack examples/benchmark/example_inp_20.msgpack ipa >> experiment.txt
