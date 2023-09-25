@@ -28,8 +28,6 @@ pub fn bench_ipa_multiexp(c: &mut Criterion) {
         group.bench_function(BenchmarkId::new("k", k), |b| {
             b.iter(|| {
                 best_multiexp(&multiexp_scalars, &multiexp_bases);
-                criterion::black_box(&multiexp_scalars);
-                criterion::black_box(&multiexp_bases);
             });
         });
     }
