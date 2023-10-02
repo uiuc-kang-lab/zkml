@@ -86,16 +86,10 @@ impl<F: PrimeField> Conv2DChip<F> {
     ci: usize,
     cj: usize,
   ) -> ((usize, usize), (usize, usize)) {
-    let ph = if h % si == 0 {
-      (ci as i64 - sj as i64).max(0)
-    } else {
-      (ci as i64 - (h % si) as i64).max(0)
-    } as usize;
-    let pw = if w % sj == 0 {
-      (cj as i64 - sj as i64).max(0)
-    } else {
-      (cj as i64 - (w % sj) as i64).max(0)
-    } as usize;
+    let output_height = (h + si - 1) / si;
+    let output_width = (w + sj - 1) / sj;
+    let ph = ((output_height - 1) as i32 * si as i32 + ci as i32 - h as i32).max(0) as usize;
+    let pw = ((output_width - 1) as i32 * sj as i32 + cj as i32 - w as i32).max(0) as usize;
     ((ph / 2, ph - ph / 2), (pw / 2, pw - pw / 2))
   }
 
@@ -448,15 +442,14 @@ impl<F: PrimeField> Layer<F> for Conv2DChip<F> {
       conv_config.padding,
     );
     let batch_size = inp_shape[0] as i64;
-
     let mut num_rows = match conv_config.conv_type {
       ConvLayerEnum::Conv2D => {
         let conv_size = weight_shape[1] * weight_shape[2] * weight_shape[3];
         let tmp_config = LayerConfig {
           layer_params: vec![0],
           inp_shapes: vec![
-            vec![weight_shape[0], conv_size],
             vec![batch_size as usize * oh * ow, conv_size],
+            vec![weight_shape[0], conv_size], // output_channel, h * w * input_channel
           ],
           ..layer_config.clone()
         };
@@ -477,9 +470,19 @@ impl<F: PrimeField> Layer<F> for Conv2DChip<F> {
 
     // This implementation always does the bias + div + relu
     let num_bdr_per_row = num_cols / 5;
-    let num_bdr_rows = num_rows.div_ceil(num_bdr_per_row);
+
+    let out_shape = &layer_config.out_shapes[0];
+    let out_size = out_shape.iter().product::<usize>() as i64;
+
+    let num_bdr_rows = out_size.div_ceil(num_bdr_per_row);
     num_rows += num_bdr_rows;
 
+    if conv_config.activation == ActivationType::Relu {
+      let num_relus_per_row = num_cols / 2;
+      let num_rows_for_relu = out_size.div_ceil(num_relus_per_row);
+      num_rows += num_rows_for_relu;
+    }
+    
     num_rows
   }
 }

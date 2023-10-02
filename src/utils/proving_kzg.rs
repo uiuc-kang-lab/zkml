@@ -126,6 +126,7 @@ pub fn time_circuit_kzg(circuit: ModelCircuit<Fr>) {
   let public_vals_u8_size = serialize(&public_vals_u8, "public_vals");
   println!("Public vals size: {} bytes", public_vals_u8_size);
 
+  let proof_duration_start = start.elapsed();
   let mut transcript = Blake2bWrite::<_, G1Affine, Challenge255<_>>::init(vec![]);
   create_proof::<
     KZGCommitmentScheme<Bn256>,
@@ -145,7 +146,7 @@ pub fn time_circuit_kzg(circuit: ModelCircuit<Fr>) {
   .unwrap();
   let proof = transcript.finalize();
   let proof_duration = start.elapsed();
-  println!("Proving time: {:?}", proof_duration - fill_duration);
+  println!("Proving time: {:?}", proof_duration - proof_duration_start);
 
   let proof_size = serialize(&proof, "proof");
   let proof = std::fs::read("proof").unwrap();

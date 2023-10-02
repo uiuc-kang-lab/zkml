@@ -65,7 +65,7 @@ impl<F: PrimeField> Layer<F> for SquareChip {
 
     // Divide
     let num_div_per_row = (num_cols - 1) / 3;
-    num_rows += (inp_size as i64).div_ceil(num_div_per_row);
+    num_rows += (inp_size as i64).div_ceil(num_div_per_row) * 2;
 
     num_rows
   }

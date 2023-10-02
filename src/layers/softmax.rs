@@ -197,6 +197,7 @@ impl<F: PrimeField> Layer<F> for SoftmaxChip {
     Ok(vec![outp])
   }
 
+  // BJ-TODO: Check again
   fn num_rows(&self, layer_config: &LayerConfig, num_cols: i64) -> i64 {
     let softmax_flat_rows = |num_el: i64| {
       let num_max_per_row = num_cols / 3;
@@ -224,7 +225,8 @@ impl<F: PrimeField> Layer<F> for SoftmaxChip {
     } else if inp_shape.len() == 3 {
       inp_shape[0] as i64 * inp_shape[1] as i64 * softmax_flat_rows(inp_shape[2] as i64)
     } else {
-      panic!("Not implemented");
+      0
+      //panic!("Not implemented");
     };
 
     num_rows

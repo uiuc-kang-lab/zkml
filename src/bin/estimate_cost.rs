@@ -1,12 +1,15 @@
 #![feature(int_roundings)]
-use std::fmt::format;
+pub use rayon::{current_num_threads, scope, Scope};
+use serde_json::Value;
+use rmp_serde::decode::from_read;
 use std::fs::File;
-use std::io::{Error, Write};
+use std::io::Error;
 use std::marker::PhantomData;
-
+use std::panic;
 use halo2_proofs::{
-    halo2curves::bn256::Fr,
+    halo2curves::bn256::{G1, Fr},
     plonk::{ConstraintSystem, Circuit},
+    dev::cost::CircuitCost,
 };
 use zkml::{
   layers::{
@@ -37,21 +40,27 @@ use zkml::{
     update::UpdateChip,
   },
   model::{ModelCircuit, GADGET_CONFIG},
-  utils::loader::load_config_msgpack,
 };
 
-pub struct MyWrapper(ConstraintSystem<Fr>);
-
-impl MyWrapper {
-  pub fn new(inner: ConstraintSystem<Fr>) -> Self {
-    MyWrapper(inner)
+// for debugging
+fn circuit_cost_without_permutation(circuit: ModelCircuit<Fr>, k: u64) -> u64 {
+    let mut k = k;
+    loop {
+      let result = panic::catch_unwind(|| {
+        CircuitCost::<G1, ModelCircuit<Fr>>::measure((k as u32).try_into().unwrap(), &circuit)
+      });
+      match result {
+        Ok(cost) => {
+          break;
+        }
+        Err(_) => {
+          println!("k = {} is not enough", k);
+          k += 1;
+        }
+      }
+    }
+    k as u64
   }
-  
-  // Expose a public method that calls the private method
-  pub fn permutation_required_degree(&self) {
-      self.0.permutation().get_columns().len();
-  }
-}
 
 fn load_constraint_from_circuit(_circuit: &ModelCircuit<Fr>) -> ConstraintSystem<Fr> {
     // create constraint system to collect custom gates
@@ -60,77 +69,65 @@ fn load_constraint_from_circuit(_circuit: &ModelCircuit<Fr>) -> ConstraintSystem
     cs
 }
 
-fn estimate_msm_time(k: i64, kzg_or_ipa: String) -> f64 {
-  if kzg_or_ipa == "kzg" {
-    match k {
-      17 => 186596404.13333336,
-      18 => 332822999.85,
-      19 => 605177533.1,
-      20 => 1121193479.2,
-      21 => 2058248654.2,
-      22 => 4051190316.6,
-      23 => 7681884225.0,
-      24 => 14132027162.7,
-      _ => {
-        println!("Warning: n_row is out of range for MSM time estimation. ");
-        0.
-      }
+fn sum_gates_degree<F: halo2_proofs::arithmetic::Field>(cs: ConstraintSystem<F>) -> u64 {
+  // The permutation argument will serve alongside the gates, so must be accounted for.
+  let mut degree: u64 = 3; 
+
+  // The lookup argument also serves alongside the gates and must be accounted for.
+  let lookups = cs.lookups();
+  let input_degree = 1;
+  let table_degree = 1;
+  for lookup in lookups {
+    for expr in lookup.input_expressions().iter() {
+      degree += std::cmp::max(input_degree, expr.degree()) as u64;
+      //println!("Input degree: {}", expr.degree())
     }
-  } else {
-    match k {
-      17 => 159672259.56420633,
-      18 => 281278377.2,
-      19 => 532171666.6,
-      20 => 992834712.7,
-      21 => 1893809104.4,
-      22 => 3530607904.0,
-      23 => 6589884079.3,
-      24 => 12725500162.3,
-      _ => {
-        println!("Warning: n_row is out of range for MSM time estimation. ");
-        0.
-      }
+    for expr in lookup.table_expressions().iter() {
+      degree += std::cmp::max(table_degree, expr.degree()) as u64;
+      //println!("Table degree: {}", expr.degree())
     }
   }
-}
 
-fn estimate_fft_time(k: i64, kzg_or_ipa: String) -> f64 {
-  if kzg_or_ipa == "kzg" {
-    match k {
-      17 => 10851875.196305115,
-      18 => 22216662.588992067,
-      19 => 46803234.09426586,
-      20 => 104462216.81559524,
-      21 => 239831734.73333335,
-      22 => 549569116.7,
-      23 => 1153836558.6,
-      24 => 2448537633.3,
-      _ => {
-        println!("Warning: n_row is out of range for MSM time estimation. ");
-        0.
-      }
-    }
-  } else {
-    match k {
-      17 => 9997985.851182539,
-      18 => 20777317.249984127,
-      19 => 43106550.292050265,
-      20 => 97406713.81198412,
-      21 => 230773451.3333333,
-      22 => 537737079.2,
-      23 => 1132904375.0,
-      24 => 2358579496.0,
-      _ => {
-        println!("Warning: n_row is out of range for MSM time estimation. ");
-        0.
-      }
+  // Account for each gate to ensure our quotient polynomial is the correct degree and that our extended domain is the right size.
+  for gate in cs.gates() {
+    for poly in gate.polynomials().iter() {
+      degree += poly.degree() as u64;
+      //println!("Poly degree: {}", poly.degree())
     }
   }
+  
+  degree
 }
 
-fn cost_estimator(n_row: u64, n_instance: u64, n_advice: u64, n_lookup: u64, n_permutation: u64, max_degree:u64, kzg_or_ipa: String) -> f64 {
+fn estimate_time(k: i64, kzg_or_ipa: String, oper_type: String, bench_statistics: &Value) -> f64 {
+  let key = format!("{}_{}", kzg_or_ipa, oper_type);
+  if oper_type == "mul" {
+    bench_statistics[key].as_f64().unwrap() * (1<<k) as f64
+  } 
+  else {
+    if let Some(value) = bench_statistics[key].get(k.to_string()) {
+      value.as_f64().unwrap()
+    } else {
+      println!("Warning: k is out of range for {} time estimation. ", oper_type);
+      0.
+    }
+  }
+  
+}
+
+fn cost_estimator<F: halo2_proofs::arithmetic::Field>(k: u64, cs: ConstraintSystem<F>, kzg_or_ipa: String, bench_statistics: &Value) -> f64 {
+  let max_degree = cs.degree() as u64;
+  let n_instance: u64 = cs.num_instance_columns() as u64;
+  let n_advice: u64 = cs.num_advice_columns() as u64;
+  let n_lookup: u64 = cs.lookups().len() as u64;
+  let n_permutation: u64 = cs.permutation().get_columns().len() as u64;
+  let mut sum_degree_num = sum_gates_degree(cs);
+  
+  //let num_threads = current_num_threads() as f64;
+  let num_threads = 32 as f64;
+  println!("Num threads: {}", num_threads);
   let mut time: f64 = 0.0;
-  let k = (n_row as f32).log2().ceil() as i16;
+  let k = k as i16;
   let extended_k = k + ((max_degree-1) as f32).log2().ceil() as i16;
 
   let chunk = max_degree-2;
@@ -144,13 +141,22 @@ fn cost_estimator(n_row: u64, n_instance: u64, n_advice: u64, n_lookup: u64, n_p
   } else {
     n_msm = n_instance + n_advice + n_lookup * 3 + permutation_chunks + max_degree;//+ 5;
   }
-  println!("Num FFTs (n={}): {}", 1<<k, n_fft);
-  println!("Num cosetFFTs (n={}): {}", 1<<extended_k, n_coset_fft);
-  println!("Num MSMs (n={}): {}", 1<<k, n_msm);
+  // println!("Num FFTs (n={}): {}", 1<<k, n_fft);
+  // println!("Num cosetFFTs (n={}): {}", 1<<extended_k, n_coset_fft);
+  // println!("Num MSMs (n={}): {}", 1<<k, n_msm);
 
-  time += n_fft as f64 * estimate_fft_time(k as i64, kzg_or_ipa.clone());
-  time += n_coset_fft as f64 * estimate_fft_time(extended_k as i64, kzg_or_ipa.clone());
-  time += n_msm as f64 * estimate_msm_time(k as i64, kzg_or_ipa.clone());
+  // Main costs (FFTs and MSMs)
+  time += n_fft as f64 * estimate_time(k as i64, kzg_or_ipa.clone(), "fft".to_string(), bench_statistics);
+  time += n_coset_fft as f64 * estimate_time(extended_k as i64, kzg_or_ipa.clone(), "fft".to_string(), bench_statistics);
+  time += n_msm as f64 * estimate_time(k as i64, kzg_or_ipa.clone(), "msm".to_string(), bench_statistics);
+  println!("Total time cost (FFT + MSM): {} (ns)", time);
+  // Additional costs (permutations and multiplications)
+  time += n_lookup as f64 * estimate_time(k as i64, kzg_or_ipa.clone(), "permute".to_string(), bench_statistics);
+  println!("Total time cost (FFT + MSM + Permute): {} (ns)", time);
+  sum_degree_num += permutation_chunks * 14 + n_lookup * 19;
+  time += sum_degree_num as f64 * estimate_time(k as i64, kzg_or_ipa.clone(), "mul".to_string(), bench_statistics) / num_threads;
+  println!("Total time cost (FFT + MSM + Permute + Mul): {} (ns)", time);
+
   time
 }
 
@@ -158,20 +164,24 @@ fn main() -> Result<(), Error> {
   let config_fname = std::env::args().nth(1).expect("config file path");
   let inp_fname = std::env::args().nth(2).expect("input file path");
   let kzg_or_ipa = std::env::args().nth(3).expect("kzg or ipa");
+  
+  // Open the Msgpack file
+  let mut bench_file = File::open("summary.msgpack").expect("Failed to open file");
 
-  let model_name_wo_ext = config_fname.split(".").collect::<Vec<&str>>()[0];
+  // Deserialize the data into a serde_json::Value
+  let bench_statistics: Value = from_read(&mut bench_file).expect("Failed to deserialize data");
 
   if kzg_or_ipa != "kzg" && kzg_or_ipa != "ipa" {
     panic!("Must specify kzg or ipa");
   }
 
-  let config = load_config_msgpack(&config_fname);
-  let circuit = ModelCircuit::<Fr>::generate_from_msgpack(config, false);
+  let circuit = ModelCircuit::<Fr>::generate_from_file(&config_fname, &inp_fname);
 
   let num_cols = GADGET_CONFIG.lock().unwrap().num_cols as i64;
   println!("Num cols: {}", num_cols);
 
-  let mut num_rows = circuit.num_random;
+  let num_constants = circuit.num_random + 5; // num_randoms + vec![0 as i64, 1, sf as i64, min_val, max_val];
+  let mut num_rows = num_constants.div_ceil(num_cols);
 
   // Number of rows from assignment
   let mut total_tensor_size = 0;
@@ -333,30 +343,39 @@ fn main() -> Result<(), Error> {
     num_rows += layer_rows;
   }
   
-  let circuit = ModelCircuit::<Fr>::generate_from_file(&config_fname, &inp_fname);
-  
   let cs: ConstraintSystem<Fr> = load_constraint_from_circuit(&circuit);
+  
+  // blinding factor
+  let blinding_factor = cs.minimum_rows() as i64;
+  println!("Blinding factor: {}", blinding_factor);
+  num_rows += blinding_factor;
+  
+  let k = (num_rows as f32).log2().ceil() as u64;
+  //let k = circuit_cost_without_permutation(circuit.clone(), k);
+  
+  // Print out some stats
   let max_degree = cs.degree() as u64;
   let num_instance: u64 = cs.num_instance_columns() as u64;
   let num_advice: u64 = cs.num_advice_columns() as u64;
   let num_fixed: u64 = cs.num_fixed_columns() as u64;
   let num_lookup: u64 = cs.lookups().len() as u64;
   let num_permutation: u64 = cs.permutation().get_columns().len() as u64;
+  let num_gates = cs.gates().len() as u64;
+  let sum_degrees = sum_gates_degree(cs.clone());
+  
   println!("Max degree: {}", max_degree);
   println!("Num instance: {}", num_instance);
   println!("Num advice: {}", num_advice);
   println!("Num fixed: {}", num_fixed);
   println!("Num lookup: {}", num_lookup);
   println!("Num permutation: {}", num_permutation);
-
-
-  let time_cost = cost_estimator(num_rows as u64, num_instance, num_advice, num_lookup, num_permutation, max_degree, kzg_or_ipa);
-  let k = (num_rows as f32).log2().ceil() as i64;
+  println!("Num gates: {}", num_gates);
+  println!("Sum degrees: {}", sum_degrees);
+  // The above println scripts are for debugging purposes only
   
-  let path = format!("{model_name_wo_ext}_k.tmp");
-  let mut output = File::create(path)?;
-  write!(output, "{}", k)?;
+  let time_cost = cost_estimator(k, cs, kzg_or_ipa, &bench_statistics);
   
+  println!("Optimal k: {}", k);
   println!("Total number of rows: {}", num_rows);
   println!("Total time cost (esitmated): {} (ns)", time_cost);
   Ok(())

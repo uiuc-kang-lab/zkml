@@ -84,6 +84,7 @@ pub fn time_circuit_ipa(circuit: ModelCircuit<Fp>) {
     fill_duration - pk_duration
   );
 
+  let proof_duration_start = start.elapsed();
   let mut transcript = Blake2bWrite::<_, _, Challenge255<_>>::init(vec![]);
   create_proof::<IPACommitmentScheme<EqAffine>, ProverIPA<EqAffine>, _, _, _, _>(
     &params,
@@ -96,7 +97,7 @@ pub fn time_circuit_ipa(circuit: ModelCircuit<Fp>) {
   .unwrap();
   let proof = transcript.finalize();
   let proof_duration = start.elapsed();
-  println!("Proving time: {:?}", proof_duration - fill_duration);
+  println!("Proving time: {:?}", proof_duration - proof_duration_start);
 
   let proof_size = {
     let mut folder = std::path::PathBuf::new();

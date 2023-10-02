@@ -148,7 +148,7 @@ impl<F: PrimeField> Layer<F> for FCDPBiasVarDivLookupChip<F> {
     // Normalization
     if self.config.normalize {
       let num_divs_per_row = (num_cols - 1) / 3;
-      let num_rows_for_div = out_size.div_ceil(num_divs_per_row);
+      let num_rows_for_div = out_size.div_ceil(num_divs_per_row) * 2;
       num_rows += num_rows_for_div;
 
       if layer_config.inp_shapes.len() == 3 {
