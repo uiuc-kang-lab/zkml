@@ -21,7 +21,7 @@ pub fn bench_ipa_mul(c: &mut Criterion) {
                 let rand_ele = vesta::Scalar::random(&mut OsRng);
                 parallelize(&mut rand_ext_vec, |rand_ext_vec, _| {
                     for value in rand_ext_vec.iter_mut() {
-                        let _ = *value * rand_ele;
+                        let _ = criterion::black_box(*value) * criterion::black_box(rand_ele);
                     }
                 })
             });

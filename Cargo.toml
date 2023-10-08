@@ -69,11 +69,3 @@ harness = false
 [[bench]]
 name = "benchmark_kzg_mul"
 harness = false
-
-[[bench]]
-name = "benchmark_kzg_add"
-harness = false
-
-[[bench]]
-name = "benchmark_kzg_permute_expression_pair"
-harness = false
