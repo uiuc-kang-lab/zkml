@@ -67,6 +67,7 @@ pub struct LayerConfig {
   pub inp_shapes: Vec<Vec<usize>>,
   pub out_shapes: Vec<Vec<usize>>,
   pub mask: Vec<i64>,
+  pub implementation_idx: i64,
 }
 
 pub type CellRc<F> = Rc<AssignedCell<F, F>>;
@@ -82,8 +83,37 @@ pub trait Layer<F: PrimeField> {
     gadget_config: Rc<GadgetConfig>,
     layer_config: &LayerConfig,
   ) -> Result<Vec<AssignedTensor<F>>, Error>;
+
+  // The layer config has the input and output sizes (hypothetically...)
+  fn num_rows(&self, layer_config: &LayerConfig, num_cols: i64) -> i64;
+
+  fn num_rows_reduction(num_elems: i64, num_elem_per_row: i64) -> i64 {
+    let mut num_rows = num_elems.div_ceil(num_elem_per_row);
+    let mut residual = num_rows;
+    while residual > 1 {
+      residual = residual.div_ceil(num_elem_per_row);
+      num_rows += residual;
+    }
+    num_rows
+  }
+
+  // Number of rows for the dot product with addition accumulator
+  fn num_rows_dot_acc(len: i64, num_cols: i64) -> i64 {
+    let inps_per_row = (num_cols - 1) / 2;
+    let num_rows_for_dot = len.div_ceil(inps_per_row);
+
+    let num_adds_per_row = num_cols - 1;
+    let num_rows_for_acc = Self::num_rows_reduction(num_rows_for_dot, num_adds_per_row);
+
+    num_rows_for_dot + num_rows_for_acc
+  }
+
+  fn num_rows_dot_bias(len: i64, num_cols: i64) -> i64 {
+    let inps_per_row = (num_cols - 2) / 2;
+    len.div_ceil(inps_per_row)
+  }
 }
 
 pub trait GadgetConsumer {
-  fn used_gadgets(&self, layer_params: Vec<i64>) -> Vec<GadgetType>;
+  fn used_gadgets(&self, layer_config: &LayerConfig) -> Vec<GadgetType>;
 }

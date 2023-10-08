@@ -47,10 +47,14 @@ impl<F: PrimeField> Layer<F> for ResizeNNChip {
     let outp = Array::from_shape_vec(IxDyn(&output_shape), flat).unwrap();
     Ok(vec![outp])
   }
+
+  fn num_rows(&self, _layer_config: &LayerConfig, _num_cols: i64) -> i64 {
+    0
+  }
 }
 
 impl GadgetConsumer for ResizeNNChip {
-  fn used_gadgets(&self, _layer_params: Vec<i64>) -> Vec<crate::gadgets::gadget::GadgetType> {
+  fn used_gadgets(&self, _layer_config: &LayerConfig) -> Vec<crate::gadgets::gadget::GadgetType> {
     vec![]
   }
 }

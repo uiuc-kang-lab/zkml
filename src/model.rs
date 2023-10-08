@@ -25,12 +25,16 @@ use crate::{
     adder::AdderChip,
     bias_div_round_relu6::BiasDivRoundRelu6Chip,
     dot_prod::DotProductChip,
+    dot_prod_bias::DotProductBiasChip,
     gadget::{Gadget, GadgetConfig, GadgetType},
     input_lookup::InputLookupChip,
     max::MaxChip,
     mul_pairs::MulPairsChip,
     nonlinear::{exp::ExpGadgetChip, pow::PowGadgetChip, relu::ReluChip, tanh::TanhGadgetChip},
-    nonlinear::{logistic::LogisticGadgetChip, rsqrt::RsqrtGadgetChip, sqrt::SqrtGadgetChip},
+    nonlinear::{
+      logistic::LogisticGadgetChip, relu_decompose::ReluDecomposeChip, rsqrt::RsqrtGadgetChip,
+      sqrt::SqrtGadgetChip,
+    },
     sqrt_big::SqrtBigChip,
     square::SquareGadgetChip,
     squared_diff::SquaredDiffGadgetChip,
@@ -46,7 +50,7 @@ use crate::{
     batch_mat_mul::BatchMatMulChip,
     conv2d::Conv2DChip,
     dag::{DAGLayerChip, DAGLayerConfig},
-    fully_connected::{FullyConnectedChip, FullyConnectedConfig},
+    fc::fully_connected::{FullyConnectedChip, FullyConnectedConfig},
     layer::{AssignedTensor, CellRc, GadgetConsumer, LayerConfig, LayerType},
     logistic::LogisticChip,
     max_pool_2d::MaxPool2DChip,
@@ -346,12 +350,14 @@ impl<F: PrimeField + Ord + FromUniformBytes<64>> ModelCircuit<F> {
       if panic_empty_tensor && num_el != value_flat.len() {
         panic!("tensor shape and data length mismatch");
       }
-      if num_el == value_flat.len() {
-        let tensor = Array::from_shape_vec(IxDyn(&shape), value_flat).unwrap();
-        tensors.insert(flat.idx, tensor);
+      let tensor = if num_el == value_flat.len() {
+        Array::from_shape_vec(IxDyn(&shape), value_flat).unwrap()
       } else {
-        // Do nothing here since we're loading the config
+        // Fill with zeros
+        Array::from_shape_vec(IxDyn(&shape), vec![F::ZERO; num_el]).unwrap()
       };
+
+      tensors.insert(flat.idx, tensor);
     }
 
     let i64_to_usize = |x: &Vec<i64>| x.iter().map(|x| *x as usize).collect::<Vec<_>>();
@@ -364,6 +370,14 @@ impl<F: PrimeField + Ord + FromUniformBytes<64>> ModelCircuit<F> {
         .iter()
         .map(|layer| {
           let layer_type = match_layer(&layer.layer_type);
+          let layer_config = LayerConfig {
+            layer_type,
+            layer_params: layer.params.clone(),
+            inp_shapes: layer.inp_shapes.iter().map(|x| i64_to_usize(x)).collect(),
+            out_shapes: layer.out_shapes.iter().map(|x| i64_to_usize(x)).collect(),
+            mask: layer.mask.clone(),
+            implementation_idx: layer.implementation.unwrap_or(0),
+          };
           let layer_gadgets = match layer_type {
             LayerType::Add => Box::new(AddChip {}) as Box<dyn GadgetConsumer>,
             LayerType::AvgPool2D => Box::new(AvgPool2DChip {}) as Box<dyn GadgetConsumer>,
@@ -407,18 +421,12 @@ impl<F: PrimeField + Ord + FromUniformBytes<64>> ModelCircuit<F> {
             LayerType::Transpose => Box::new(TransposeChip {}) as Box<dyn GadgetConsumer>,
             LayerType::Update => Box::new(UpdateChip {}) as Box<dyn GadgetConsumer>,
           }
-          .used_gadgets(layer.params.clone());
+          .used_gadgets(&layer_config);
           for gadget in layer_gadgets {
             used_gadgets.insert(gadget);
           }
 
-          LayerConfig {
-            layer_type,
-            layer_params: layer.params.clone(),
-            inp_shapes: layer.inp_shapes.iter().map(|x| i64_to_usize(x)).collect(),
-            out_shapes: layer.out_shapes.iter().map(|x| i64_to_usize(x)).collect(),
-            mask: layer.mask.clone(),
-          }
+          layer_config
         })
         .collect::<Vec<_>>();
       let inp_idxes = config
@@ -592,12 +600,14 @@ impl<F: PrimeField + Ord + FromUniformBytes<64>> Circuit<F> for ModelCircuit<F> 
         GadgetType::BiasDivRoundRelu6 => BiasDivRoundRelu6Chip::<F>::configure(meta, gadget_config),
         GadgetType::BiasDivFloorRelu6 => panic!(),
         GadgetType::DotProduct => DotProductChip::<F>::configure(meta, gadget_config),
+        GadgetType::DotProductBias => DotProductBiasChip::<F>::configure(meta, gadget_config),
         GadgetType::Exp => ExpGadgetChip::<F>::configure(meta, gadget_config),
         GadgetType::Logistic => LogisticGadgetChip::<F>::configure(meta, gadget_config),
         GadgetType::Max => MaxChip::<F>::configure(meta, gadget_config),
         GadgetType::MulPairs => MulPairsChip::<F>::configure(meta, gadget_config),
         GadgetType::Pow => PowGadgetChip::<F>::configure(meta, gadget_config),
         GadgetType::Relu => ReluChip::<F>::configure(meta, gadget_config),
+        GadgetType::ReluDecompose => ReluDecomposeChip::<F>::configure(meta, gadget_config),
         GadgetType::Rsqrt => RsqrtGadgetChip::<F>::configure(meta, gadget_config),
         GadgetType::Sqrt => SqrtGadgetChip::<F>::configure(meta, gadget_config),
         GadgetType::SqrtBig => SqrtBigChip::<F>::configure(meta, gadget_config),
@@ -662,6 +672,10 @@ impl<F: PrimeField + Ord + FromUniformBytes<64>> Circuit<F> for ModelCircuit<F> 
           let chip = DotProductChip::<F>::construct(gadget_rc.clone());
           chip.load_lookups(layouter.namespace(|| "dot product lookup"))?;
         }
+        GadgetType::DotProductBias => {
+          let chip = DotProductBiasChip::<F>::construct(gadget_rc.clone());
+          chip.load_lookups(layouter.namespace(|| "dot product bias lookup"))?;
+        }
         GadgetType::VarDivRound => {
           let chip = VarDivRoundChip::<F>::construct(gadget_rc.clone());
           chip.load_lookups(layouter.namespace(|| "var div lookup"))?;
@@ -673,6 +687,10 @@ impl<F: PrimeField + Ord + FromUniformBytes<64>> Circuit<F> for ModelCircuit<F> 
         GadgetType::Relu => {
           let chip = ReluChip::<F>::construct(gadget_rc.clone());
           chip.load_lookups(layouter.namespace(|| "relu lookup"))?;
+        }
+        GadgetType::ReluDecompose => {
+          let chip = ReluDecomposeChip::<F>::construct(gadget_rc.clone());
+          chip.load_lookups(layouter.namespace(|| "relu decompose lookup"))?;
         }
         GadgetType::Rsqrt => {
           let chip = RsqrtGadgetChip::<F>::construct(gadget_rc.clone());

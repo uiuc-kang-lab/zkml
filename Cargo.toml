@@ -13,17 +13,11 @@ exclude = [
   "python",
 ]
 
-[profile.dev]
-opt-level = 3
-
-[profile.test]
-opt-level = 3
-
 [dependencies]
 bitvec = "1.0.1"
-halo2 = { git="https://github.com/privacy-scaling-explorations/halo2", package="halo2", rev="17e9765c199670534c0299c96128d0464a188d0b" }
-halo2_gadgets = { git="https://github.com/privacy-scaling-explorations/halo2", package="halo2_gadgets", rev="17e9765c199670534c0299c96128d0464a188d0b", features = ["circuit-params"] }
-halo2_proofs = { git="https://github.com/privacy-scaling-explorations/halo2", package="halo2_proofs", rev="17e9765c199670534c0299c96128d0464a188d0b", features = ["circuit-params"] }
+halo2 = { path = "halo2/halo2"}
+halo2_gadgets = { path = "halo2/halo2_gadgets", features = ["circuit-params"] }
+halo2_proofs = { path = "halo2/halo2_proofs", features = ["circuit-params"] }
 lazy_static = "1.4.0"
 ndarray = "0.15.6"
 num-bigint = "0.4.3"
@@ -36,4 +30,50 @@ serde = "1.0.152"
 serde_derive = "1.0.152"
 serde_json = "1.0.85"
 wav = "1.0.0"
+rayon = "1.5.1"
 
+[dev-dependencies]
+rand_core = "0.6.4"
+criterion = "0.5.1"
+group = "0.13.0"
+ff = "0.13.0"
+
+[[bench]]
+name = "benchmark_ipa_fft"
+harness = false
+
+[[bench]]
+name = "benchmark_ipa_msm"
+harness = false
+
+[[bench]]
+name = "benchmark_ipa_mul"
+harness = false
+
+[[bench]]
+name = "benchmark_ipa_add"
+harness = false
+
+[[bench]]
+name = "benchmark_ipa_permute_expression_pair"
+harness = false
+
+[[bench]]
+name = "benchmark_kzg_fft"
+harness = false
+
+[[bench]]
+name = "benchmark_kzg_msm"
+harness = false
+
+[[bench]]
+name = "benchmark_kzg_mul"
+harness = false
+
+[[bench]]
+name = "benchmark_kzg_add"
+harness = false
+
+[[bench]]
+name = "benchmark_kzg_permute_expression_pair"
+harness = false

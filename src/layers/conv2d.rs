@@ -17,7 +17,7 @@ use crate::{
     nonlinear::relu::ReluChip,
   },
   layers::{
-    fully_connected::{FullyConnectedChip, FullyConnectedConfig},
+    fc::fully_connected::{FullyConnectedChip, FullyConnectedConfig},
     shape::pad::pad,
   },
 };
@@ -86,16 +86,10 @@ impl<F: PrimeField> Conv2DChip<F> {
     ci: usize,
     cj: usize,
   ) -> ((usize, usize), (usize, usize)) {
-    let ph = if h % si == 0 {
-      (ci as i64 - sj as i64).max(0)
-    } else {
-      (ci as i64 - (h % si) as i64).max(0)
-    } as usize;
-    let pw = if w % sj == 0 {
-      (cj as i64 - sj as i64).max(0)
-    } else {
-      (cj as i64 - (w % sj) as i64).max(0)
-    } as usize;
+    let output_height = (h + si - 1) / si;
+    let output_width = (w + sj - 1) / sj;
+    let ph = ((output_height - 1) as i32 * si as i32 + ci as i32 - h as i32).max(0) as usize;
+    let pw = ((output_width - 1) as i32 * sj as i32 + cj as i32 - w as i32).max(0) as usize;
     ((ph / 2, ph - ph / 2), (pw / 2, pw - pw / 2))
   }
 
@@ -409,6 +403,7 @@ impl<F: PrimeField> Layer<F> for Conv2DChip<F> {
     } else if conv_config.activation == ActivationType::Relu {
       let dived = outp.iter().skip(1).step_by(2).collect::<Vec<_>>();
       let relu_chip = ReluChip::<F>::construct(gadget_config.clone());
+      // let relu_chip = ReluDecomposeChip::<F>::construct(gadget_config.clone());
       let relu_outp = relu_chip
         .forward(layouter.namespace(|| "relu"), &vec![dived], &tmp)
         .unwrap();
@@ -431,11 +426,72 @@ impl<F: PrimeField> Layer<F> for Conv2DChip<F> {
 
     Ok(vec![outp])
   }
+
+  fn num_rows(&self, layer_config: &LayerConfig, num_cols: i64) -> i64 {
+    let conv_config = &Self::param_vec_to_config(layer_config.layer_params.clone());
+    let inp_shape = layer_config.inp_shapes[0].clone();
+    let weight_shape = layer_config.inp_shapes[1].clone();
+
+    let (oh, ow) = Self::out_hw(
+      inp_shape[1],
+      inp_shape[2],
+      conv_config.stride.0,
+      conv_config.stride.1,
+      weight_shape[1],
+      weight_shape[2],
+      conv_config.padding,
+    );
+    let batch_size = inp_shape[0] as i64;
+    let mut num_rows = match conv_config.conv_type {
+      ConvLayerEnum::Conv2D => {
+        let conv_size = weight_shape[1] * weight_shape[2] * weight_shape[3];
+        let tmp_config = LayerConfig {
+          layer_params: vec![0],
+          inp_shapes: vec![
+            vec![weight_shape[0], conv_size], // output_channel, h * w * input_channel
+            vec![batch_size as usize * oh * ow, conv_size],
+          ],
+          out_shapes: vec![vec![weight_shape[0], batch_size as usize * oh * ow]],
+          ..layer_config.clone()
+        };
+        let fc_chip = FullyConnectedChip::<F> {
+          _marker: PhantomData,
+          config: FullyConnectedConfig::construct(false),
+        };
+        fc_chip.num_rows(&tmp_config, num_cols)
+      }
+      ConvLayerEnum::DepthwiseConv2D => {
+        let num_dots = (oh * ow * weight_shape[3]) as i64;
+        let dot_size = (weight_shape[1] * weight_shape[2]) as i64;
+        let num_rows_for_dot =
+          <Conv2DChip<F> as Layer<F>>::num_rows_dot_acc(dot_size as i64, num_cols);
+        num_dots * num_rows_for_dot * batch_size
+      }
+    };
+
+    // This implementation always does the bias + div + relu
+    let num_bdr_per_row = num_cols / 5;
+
+    let out_shape = &layer_config.out_shapes[0];
+    let out_size = out_shape.iter().product::<usize>() as i64;
+
+    let num_bdr_rows = out_size.div_ceil(num_bdr_per_row);
+
+    num_rows += num_bdr_rows;
+
+    if conv_config.activation == ActivationType::Relu {
+      let num_relus_per_row = num_cols / 2;
+      let num_rows_for_relu = out_size.div_ceil(num_relus_per_row);
+      num_rows += num_rows_for_relu;
+    }
+
+    num_rows
+  }
 }
 
 impl<F: PrimeField> GadgetConsumer for Conv2DChip<F> {
-  fn used_gadgets(&self, layer_params: Vec<i64>) -> Vec<crate::gadgets::gadget::GadgetType> {
-    let conv_config = &Self::param_vec_to_config(layer_params.clone());
+  fn used_gadgets(&self, layer_config: &LayerConfig) -> Vec<crate::gadgets::gadget::GadgetType> {
+    let conv_config = &Self::param_vec_to_config(layer_config.layer_params.clone());
     let mut outp = vec![
       GadgetType::Adder,
       GadgetType::DotProduct,

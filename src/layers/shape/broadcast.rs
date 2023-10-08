@@ -62,10 +62,14 @@ impl<F: PrimeField> Layer<F> for BroadcastChip {
     let out = Array::from_shape_vec(output_shape, output_flat).unwrap();
     Ok(vec![out])
   }
+
+  fn num_rows(&self, _layer_config: &LayerConfig, _num_cols: i64) -> i64 {
+    0
+  }
 }
 
 impl GadgetConsumer for BroadcastChip {
-  fn used_gadgets(&self, _layer_params: Vec<i64>) -> Vec<crate::gadgets::gadget::GadgetType> {
+  fn used_gadgets(&self, _layer_config: &LayerConfig) -> Vec<crate::gadgets::gadget::GadgetType> {
     vec![]
   }
 }

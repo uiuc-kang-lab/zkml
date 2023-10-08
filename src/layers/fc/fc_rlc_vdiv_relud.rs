@@ -1,115 +1,31 @@
 use std::{collections::HashMap, marker::PhantomData, rc::Rc};
 
-use halo2_proofs::{
-  circuit::{AssignedCell, Layouter, Region, Value},
-  halo2curves::ff::PrimeField,
-  plonk::{Advice, Column, Error},
-};
+use halo2_proofs::{circuit::Layouter, halo2curves::ff::PrimeField, plonk::Error};
 use ndarray::{Array, ArrayView, Axis, IxDyn};
 
 use crate::{
   gadgets::{
     add_pairs::AddPairsChip,
     dot_prod::DotProductChip,
-    gadget::{Gadget, GadgetConfig, GadgetType},
-    nonlinear::relu::ReluChip,
+    gadget::Gadget,
+    gadget::{GadgetConfig, GadgetType},
+    nonlinear::relu_decompose::ReluDecomposeChip,
     var_div::VarDivRoundChip,
   },
-  layers::layer::ActivationType,
-  utils::helpers::RAND_START_IDX,
+  layers::{
+    fc::fully_connected::FullyConnectedChip,
+    layer::{ActivationType, AssignedTensor, CellRc, GadgetConsumer, Layer, LayerConfig},
+  },
 };
 
-use super::layer::{AssignedTensor, CellRc, GadgetConsumer, Layer, LayerConfig};
+use super::fully_connected::FullyConnectedConfig;
 
-pub struct FullyConnectedConfig {
-  pub normalize: bool, // Should be true
-}
-
-impl FullyConnectedConfig {
-  pub fn construct(normalize: bool) -> Self {
-    Self { normalize }
-  }
-}
-
-pub struct FullyConnectedChip<F: PrimeField> {
+pub struct FCRLCVarDivReludChip<F: PrimeField> {
   pub _marker: PhantomData<F>,
   pub config: FullyConnectedConfig,
 }
 
-impl<F: PrimeField> FullyConnectedChip<F> {
-  pub fn compute_mm(
-    // input: &AssignedTensor<F>,
-    input: &ArrayView<CellRc<F>, IxDyn>,
-    weight: &AssignedTensor<F>,
-  ) -> Array<Value<F>, IxDyn> {
-    assert_eq!(input.ndim(), 2);
-    assert_eq!(weight.ndim(), 2);
-    assert_eq!(input.shape()[1], weight.shape()[0]);
-
-    let mut outp = vec![];
-    for i in 0..input.shape()[0] {
-      for j in 0..weight.shape()[1] {
-        let mut sum = input[[i, 0]].value().map(|x: &F| *x) * weight[[0, j]].value();
-        for k in 1..input.shape()[1] {
-          sum = sum + input[[i, k]].value().map(|x: &F| *x) * weight[[k, j]].value();
-        }
-        outp.push(sum);
-      }
-    }
-
-    let out_shape = [input.shape()[0], weight.shape()[1]];
-    Array::from_shape_vec(IxDyn(out_shape.as_slice()), outp).unwrap()
-  }
-
-  pub fn assign_array(
-    columns: &Vec<Column<Advice>>,
-    region: &mut Region<F>,
-    array: &Array<Value<F>, IxDyn>,
-  ) -> Result<Array<AssignedCell<F, F>, IxDyn>, Error> {
-    assert_eq!(array.ndim(), 2);
-
-    let mut outp = vec![];
-    for (idx, val) in array.iter().enumerate() {
-      let row_idx = idx / columns.len();
-      let col_idx = idx % columns.len();
-      let cell = region
-        .assign_advice(|| "assign array", columns[col_idx], row_idx, || *val)
-        .unwrap();
-      outp.push(cell);
-    }
-
-    let out_shape = [array.shape()[0], array.shape()[1]];
-    Ok(Array::from_shape_vec(IxDyn(out_shape.as_slice()), outp).unwrap())
-  }
-
-  pub fn random_vector(
-    constants: &HashMap<i64, CellRc<F>>,
-    size: usize,
-  ) -> Result<Vec<CellRc<F>>, Error> {
-    let mut outp = vec![];
-    for idx in 0..size {
-      let idx = RAND_START_IDX + (idx as i64);
-      if !constants.contains_key(&idx) {
-        println!("Random vector is too small: {:?}", size);
-      }
-      let cell = constants.get(&idx).unwrap().clone();
-      outp.push(cell);
-    }
-
-    Ok(outp)
-  }
-
-  fn get_activation(&self, layer_params: &Vec<i64>) -> ActivationType {
-    let activation = layer_params[0];
-    match activation {
-      0 => ActivationType::None,
-      1 => ActivationType::Relu,
-      _ => panic!("Unsupported activation type for fully connected"),
-    }
-  }
-}
-
-impl<F: PrimeField> Layer<F> for FullyConnectedChip<F> {
+impl<F: PrimeField> Layer<F> for FCRLCVarDivReludChip<F> {
   fn forward(
     &self,
     mut layouter: impl Layouter<F>,
@@ -118,8 +34,7 @@ impl<F: PrimeField> Layer<F> for FullyConnectedChip<F> {
     gadget_config: Rc<GadgetConfig>,
     layer_config: &LayerConfig,
   ) -> Result<Vec<AssignedTensor<F>>, Error> {
-    assert!(tensors.len() <= 3);
-    let activation = self.get_activation(&layer_config.layer_params);
+    let activation = FullyConnectedChip::<F>::get_activation(&layer_config.layer_params);
 
     let input = &tensors[0];
     let ndim = input.ndim();
@@ -136,9 +51,10 @@ impl<F: PrimeField> Layer<F> for FullyConnectedChip<F> {
       .assign_region(
         || "compute and assign mm",
         |mut region| {
-          let mm_result = Self::compute_mm(&input, weight);
+          let mm_result = FullyConnectedChip::compute_mm(&input, weight);
           let mm_result =
-            Self::assign_array(&gadget_config.columns, &mut region, &mm_result).unwrap();
+            FullyConnectedChip::assign_array(&gadget_config.columns, &mut region, &mm_result)
+              .unwrap();
 
           Ok(mm_result)
         },
@@ -146,8 +62,8 @@ impl<F: PrimeField> Layer<F> for FullyConnectedChip<F> {
       .unwrap();
 
     // Generate random vectors
-    let r1 = Self::random_vector(constants, mm_result.shape()[0]).unwrap();
-    let r2 = Self::random_vector(constants, mm_result.shape()[1]).unwrap();
+    let r1 = FullyConnectedChip::random_vector(constants, mm_result.shape()[0]).unwrap();
+    let r2 = FullyConnectedChip::random_vector(constants, mm_result.shape()[1]).unwrap();
 
     let dot_prod_chip = DotProductChip::<F>::construct(gadget_config.clone());
     let r1_ref = r1.iter().map(|x| x.as_ref()).collect::<Vec<_>>();
@@ -281,11 +197,11 @@ impl<F: PrimeField> Layer<F> for FullyConnectedChip<F> {
       };
 
       let mm_div = if activation == ActivationType::Relu {
-        let relu_chip = ReluChip::<F>::construct(gadget_config.clone());
+        let relu_chip = ReluDecomposeChip::<F>::construct(gadget_config.clone());
         let mm_div = mm_div.iter().collect::<Vec<_>>();
         let vec_inputs = vec![mm_div];
         relu_chip
-          .forward(layouter.namespace(|| "relu"), &vec_inputs, &vec![zero])
+          .forward(layouter.namespace(|| "relu_decompose"), &vec_inputs, &vec![zero])
           .unwrap()
       } else if activation == ActivationType::None {
         mm_div
@@ -304,20 +220,81 @@ impl<F: PrimeField> Layer<F> for FullyConnectedChip<F> {
 
     Ok(vec![final_result])
   }
+
+  fn num_rows(&self, layer_config: &LayerConfig, num_cols: i64) -> i64 {
+    // Assign the result
+    let out_shape = &layer_config.out_shapes[0];
+    //assert_eq!(out_shape.len(), 2);
+    let out_size = out_shape.iter().product::<usize>() as i64;
+    let mut num_rows = out_size.div_ceil(num_cols);
+
+    // r1 * result
+    num_rows +=
+      <FCRLCVarDivReludChip<F> as Layer<F>>::num_rows_dot_acc(out_shape[0] as i64, num_cols)
+        * (out_shape[1] as i64);
+    // r1 * result * r2
+    num_rows +=
+      <FCRLCVarDivReludChip<F> as Layer<F>>::num_rows_dot_acc(out_shape[1] as i64, num_cols);
+
+    // r1 * input
+    let inp_shape = &layer_config.inp_shapes[0];
+    let inp_shape = if inp_shape.len() == 2 {
+      inp_shape
+    } else {
+      &inp_shape[1..]
+    };
+    num_rows +=
+      <FCRLCVarDivReludChip<F> as Layer<F>>::num_rows_dot_acc(inp_shape[0] as i64, num_cols)
+        * (inp_shape[1] as i64);
+
+    let weight_shape = &layer_config.inp_shapes[1];
+    num_rows +=
+      <FCRLCVarDivReludChip<F> as Layer<F>>::num_rows_dot_acc(weight_shape[0] as i64, num_cols)
+        * (weight_shape[1] as i64);
+
+    // (r1 * input) * (weight * r2)
+    num_rows +=
+      <FCRLCVarDivReludChip<F> as Layer<F>>::num_rows_dot_acc(inp_shape[1] as i64, num_cols);
+
+    // FC equality check
+    num_rows += 2;
+
+    // Normalization
+    if self.config.normalize {
+      let num_divs_per_row = (num_cols - 1) / 3;
+      let num_rows_for_div = out_size.div_ceil(num_divs_per_row);
+      num_rows += num_rows_for_div;
+
+      if layer_config.inp_shapes.len() == 3 {
+        let num_adds_per_row = num_cols / 3;
+        let num_rows_for_add = out_size.div_ceil(num_adds_per_row);
+        num_rows += num_rows_for_add;
+      }
+
+      let activation = FullyConnectedChip::<F>::get_activation(&layer_config.layer_params);
+      if activation == ActivationType::Relu {
+        num_rows += out_size;
+      }
+    }
+    println!("#####FC num_rows: {}", num_rows);
+    num_rows
+  }
 }
 
-impl<F: PrimeField> GadgetConsumer for FullyConnectedChip<F> {
-  fn used_gadgets(&self, layer_params: Vec<i64>) -> Vec<crate::gadgets::gadget::GadgetType> {
-    let activation = self.get_activation(&layer_params);
+impl<F: PrimeField> GadgetConsumer for FCRLCVarDivReludChip<F> {
+  fn used_gadgets(&self, layer_config: &LayerConfig) -> Vec<crate::gadgets::gadget::GadgetType> {
+    let activation = FullyConnectedChip::<F>::get_activation(&layer_config.layer_params);
     let mut outp = vec![
       GadgetType::Adder,
-      GadgetType::AddPairs,
       GadgetType::DotProduct,
       GadgetType::VarDivRound,
       GadgetType::InputLookup,
     ];
+    if layer_config.inp_shapes.len() >= 3 {
+      outp.push(GadgetType::AddPairs);
+    }
     match activation {
-      ActivationType::Relu => outp.push(GadgetType::Relu),
+      ActivationType::Relu => outp.push(GadgetType::ReluDecompose),
       ActivationType::None => (),
       _ => panic!("Unsupported activation type"),
     }

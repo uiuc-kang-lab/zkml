@@ -125,6 +125,7 @@ impl<F: PrimeField> Layer<F> for SoftmaxChip {
     layer_config: &LayerConfig,
   ) -> Result<Vec<AssignedTensor<F>>, Error> {
     let inp = &tensors[0];
+    println!("INP_DIM: {}", inp.ndim());
     assert!(inp.ndim() == 2 || inp.ndim() == 3 || inp.ndim() == 4);
     if inp.ndim() == 4 {
       assert_eq!(inp.shape()[0], 1);
@@ -196,10 +197,56 @@ impl<F: PrimeField> Layer<F> for SoftmaxChip {
     let outp = Array::from_shape_vec(IxDyn(inp.shape()), outp).unwrap();
     Ok(vec![outp])
   }
+
+  fn num_rows(&self, layer_config: &LayerConfig, num_cols: i64) -> i64 {
+    let softmax_flat_rows = |num_el: i64| {
+      let num_max_per_row = num_cols / 3;
+      let num_max_inputs_per_row = num_max_per_row * 2;
+      let num_iters = num_el.div_ceil(num_max_inputs_per_row) + num_max_inputs_per_row;
+
+      let mut num_max_rows = num_el.div_ceil(num_max_inputs_per_row);
+      let mut current_output_len = num_max_rows * num_max_per_row;
+      for _ in 0..num_iters {
+        num_max_rows += current_output_len.div_ceil(num_max_inputs_per_row);
+        current_output_len = (current_output_len/2).div_ceil(num_max_per_row) * num_max_per_row;
+      }
+
+      let num_sub_per_row = num_cols / 3;
+      let num_sub_rows = num_el.div_ceil(num_sub_per_row);
+
+      let num_exp_per_row = num_cols / 2;
+      let num_exp_rows = num_el.div_ceil(num_exp_per_row);
+
+      let num_add_per_row = num_cols - 1;
+      let num_add_rows = <SoftmaxChip as Layer<F>>::num_rows_reduction(num_el, num_add_per_row);
+
+      let num_div_per_row = (num_cols - 1) / 9;
+      let num_div_rows = num_el.div_ceil(num_div_per_row);
+
+      // +1 because of the division of the sum by the scale factor
+      num_max_rows + num_sub_rows + num_exp_rows + num_add_rows + num_div_rows + 1
+    };
+
+    let inp_shape = &layer_config.inp_shapes[0];
+    let num_rows = if inp_shape.len() == 2 {
+      inp_shape[0] as i64 * softmax_flat_rows(inp_shape[1] as i64)
+    } else if inp_shape.len() == 3 {
+      inp_shape[0] as i64 * inp_shape[1] as i64 * softmax_flat_rows(inp_shape[2] as i64)
+    } else if inp_shape.len() == 4 {
+      // TODO: Check this
+      assert_eq!(inp_shape[0], 1);
+      inp_shape[1] as i64 * inp_shape[2] as i64 * softmax_flat_rows(inp_shape[3] as i64)
+    } else {
+      0
+      //panic!("Not implemented");
+    };
+    println!("#######Softmax num_rows: {}", num_rows);
+    num_rows
+  }
 }
 
 impl GadgetConsumer for SoftmaxChip {
-  fn used_gadgets(&self, _layer_params: Vec<i64>) -> Vec<crate::gadgets::gadget::GadgetType> {
+  fn used_gadgets(&self, _layer_config: &LayerConfig) -> Vec<crate::gadgets::gadget::GadgetType> {
     vec![
       GadgetType::Exp,
       GadgetType::Adder,

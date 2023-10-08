@@ -42,10 +42,14 @@ impl<F: PrimeField + Ord> Layer<F> for UpdateChip {
 
     Ok(vec![out])
   }
+
+  fn num_rows(&self, _layer_config: &LayerConfig, _num_cols: i64) -> i64 {
+    panic!("Not implemented")
+  }
 }
 
 impl GadgetConsumer for UpdateChip {
-  fn used_gadgets(&self, _layer_params: Vec<i64>) -> Vec<crate::gadgets::gadget::GadgetType> {
+  fn used_gadgets(&self, _layer_config: &LayerConfig) -> Vec<crate::gadgets::gadget::GadgetType> {
     vec![GadgetType::Update]
   }
 }

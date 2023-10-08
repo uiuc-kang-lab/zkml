@@ -74,10 +74,25 @@ impl<F: PrimeField> Layer<F> for MulChip {
     let out = Array::from_shape_vec(IxDyn(out_shape.as_slice()), out).unwrap();
     Ok(vec![out])
   }
+
+  fn num_rows(&self, layer_config: &LayerConfig, num_cols: i64) -> i64 {
+    let inp_size = <MulChip as Arithmetic<F>>::get_inp_size(layer_config);
+
+    // Multiplication
+    let num_mul_per_row = num_cols / 3;
+    let mut num_rows = (inp_size as i64).div_ceil(num_mul_per_row);
+
+    // Division by the scale factor
+    // FIXME: should be taken from the gadgets...
+    let num_div_per_row = (num_cols - 1) / 3;
+    num_rows += (inp_size as i64).div_ceil(num_div_per_row);
+
+    num_rows
+  }
 }
 
 impl GadgetConsumer for MulChip {
-  fn used_gadgets(&self, _layer_params: Vec<i64>) -> Vec<crate::gadgets::gadget::GadgetType> {
+  fn used_gadgets(&self, _layer_config: &LayerConfig) -> Vec<crate::gadgets::gadget::GadgetType> {
     vec![
       GadgetType::MulPairs,
       GadgetType::VarDivRound,

@@ -5,13 +5,10 @@ use ndarray::{Array, Axis, IxDyn};
 
 use crate::{
   gadgets::gadget::{GadgetConfig, GadgetType},
-  layers::fully_connected::FullyConnectedConfig,
+  layers::fc::fully_connected::{FullyConnectedChip, FullyConnectedConfig},
 };
 
-use super::{
-  fully_connected::FullyConnectedChip,
-  layer::{AssignedTensor, CellRc, GadgetConsumer, Layer, LayerConfig},
-};
+use super::layer::{AssignedTensor, CellRc, GadgetConsumer, Layer, LayerConfig};
 
 pub struct BatchMatMulChip {}
 
@@ -81,10 +78,46 @@ impl<F: PrimeField> Layer<F> for BatchMatMulChip {
     let outp = Array::from_shape_vec(IxDyn(out_shape.as_slice()), outp).unwrap();
     Ok(vec![outp])
   }
+
+  fn num_rows(&self, layer_config: &LayerConfig, num_cols: i64) -> i64 {
+    let adj_y = layer_config.layer_params[1] == 1;
+    let (inp1_shape, inp2_shape) = if adj_y {
+      (
+        layer_config.inp_shapes[0].clone(),
+        layer_config.inp_shapes[1].clone(),
+      )
+    } else {
+      (
+        layer_config.inp_shapes[0].clone(),
+        vec![
+          layer_config.inp_shapes[1][0],
+          layer_config.inp_shapes[1][2],
+          layer_config.inp_shapes[1][1],
+        ],
+      )
+    };
+
+    let one_mm_num_rows = {
+      let inp1_one_shape = vec![inp1_shape[1], inp1_shape[2]];
+      let inp2_one_shape = vec![inp2_shape[1], inp2_shape[2]];
+      let tmp_config = LayerConfig {
+        layer_params: vec![0],
+        inp_shapes: vec![inp1_one_shape, inp2_one_shape],
+        ..layer_config.clone()
+      };
+      let fc_chip = FullyConnectedChip::<F> {
+        _marker: PhantomData,
+        config: FullyConnectedConfig::construct(true),
+      };
+      fc_chip.num_rows(&tmp_config, num_cols)
+    };
+
+    inp1_shape[0] as i64 * one_mm_num_rows
+  }
 }
 
 impl GadgetConsumer for BatchMatMulChip {
-  fn used_gadgets(&self, _layer_params: Vec<i64>) -> Vec<crate::gadgets::gadget::GadgetType> {
+  fn used_gadgets(&self, _layer_config: &LayerConfig) -> Vec<crate::gadgets::gadget::GadgetType> {
     vec![
       GadgetType::Adder,
       GadgetType::DotProduct,

@@ -75,17 +75,26 @@ impl<F: PrimeField> Layer<F> for AvgPool2DChip {
 
     let inp = &tensors[0];
     // TODO: refactor this
-    let out_xy = MaxPool2DChip::shape(inp, layer_config);
+    let out_xy = MaxPool2DChip::<F>::shape(inp.shape(), layer_config);
     let out_shape = vec![1, out_xy.0, out_xy.1, inp.shape()[3]];
     println!("out_shape: {:?}", out_shape);
 
     let out = Array::from_shape_vec(IxDyn(&out_shape), dived).unwrap();
     Ok(vec![out])
   }
+
+  fn num_rows(&self, layer_config: &LayerConfig, num_cols: i64) -> i64 {
+    let out_shape = &layer_config.out_shapes[0];
+
+    let num_sums: usize = out_shape.iter().product();
+    let num_inps_per_sum = layer_config.layer_params[0] * layer_config.layer_params[1];
+
+    Averager::<F>::get_num_rows(self, num_sums as i64, num_inps_per_sum as i64, num_cols)
+  }
 }
 
 impl GadgetConsumer for AvgPool2DChip {
-  fn used_gadgets(&self, _layer_params: Vec<i64>) -> Vec<crate::gadgets::gadget::GadgetType> {
+  fn used_gadgets(&self, _layer_config: &LayerConfig) -> Vec<crate::gadgets::gadget::GadgetType> {
     vec![
       GadgetType::Adder,
       GadgetType::VarDivRound,

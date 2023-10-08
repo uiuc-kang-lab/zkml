@@ -18,7 +18,7 @@ pub struct MaxPool2DChip<F: PrimeField> {
 }
 
 impl<F: PrimeField> MaxPool2DChip<F> {
-  pub fn shape(inp: &AssignedTensor<F>, layer_config: &LayerConfig) -> (usize, usize) {
+  pub fn shape(shape: &[usize], layer_config: &LayerConfig) -> (usize, usize) {
     let params = &layer_config.layer_params;
     let (fx, fy) = (params[0], params[1]);
     let (fx, fy) = (fx as usize, fy as usize);
@@ -26,17 +26,9 @@ impl<F: PrimeField> MaxPool2DChip<F> {
     let (sx, sy) = (sx as usize, sy as usize);
 
     // Only support batch size 1 for now
-    assert_eq!(inp.shape()[0], 1);
+    assert_eq!(shape[0], 1);
 
-    let out_shape = Conv2DChip::<F>::out_hw(
-      inp.shape()[1],
-      inp.shape()[2],
-      sx,
-      sy,
-      fx,
-      fy,
-      PaddingEnum::Valid,
-    );
+    let out_shape = Conv2DChip::<F>::out_hw(shape[1], shape[2], sx, sy, fx, fy, PaddingEnum::Valid);
 
     out_shape
   }
@@ -54,7 +46,7 @@ impl<F: PrimeField> MaxPool2DChip<F> {
     // Only support batch size 1 for now
     assert_eq!(inp.shape()[0], 1);
 
-    let out_shape = Self::shape(inp, layer_config);
+    let out_shape = Self::shape(inp.shape(), layer_config);
 
     let mut splat = vec![];
     for i in 0..out_shape.0 {
@@ -108,17 +100,37 @@ impl<F: PrimeField> Layer<F> for MaxPool2DChip<F> {
     let out = out.into_iter().map(|x| Rc::new(x)).collect();
 
     // TODO: refactor this
-    let out_xy = Self::shape(inp, layer_config);
+    let out_xy = Self::shape(inp.shape(), layer_config);
     let out_shape = vec![1, out_xy.0, out_xy.1, inp.shape()[3]];
 
     let out = Array::from_shape_vec(IxDyn(&out_shape), out).unwrap();
 
     Ok(vec![out])
   }
+
+  fn num_rows(&self, layer_config: &LayerConfig, num_cols: i64) -> i64 {
+    let out_shape = &layer_config.out_shapes[0];
+
+    let num_maxes: usize = out_shape.iter().product();
+    let num_inps_per_max = layer_config.layer_params[0] * layer_config.layer_params[1];
+
+    // TODO: check this, check add/sub/mul pairs gadget...
+    let num_max_per_row = num_cols / 3;
+    let num_max_inputs_per_row = num_max_per_row * 2;
+    let num_iters = num_inps_per_max.div_ceil(num_max_inputs_per_row) + num_max_inputs_per_row;
+    let mut num_rows_per_max  = num_inps_per_max.div_ceil(num_max_inputs_per_row);
+    let mut current_output_len = num_rows_per_max  * num_max_per_row;
+    for _ in 0..num_iters {
+      num_rows_per_max  += current_output_len.div_ceil(num_max_inputs_per_row);
+      current_output_len = (current_output_len/2).div_ceil(num_max_per_row) * num_max_per_row;
+    }
+
+    (num_maxes as i64) * (num_rows_per_max as i64)
+  }
 }
 
 impl<F: PrimeField> GadgetConsumer for MaxPool2DChip<F> {
-  fn used_gadgets(&self, _layer_params: Vec<i64>) -> Vec<GadgetType> {
+  fn used_gadgets(&self, _layer_config: &LayerConfig) -> Vec<GadgetType> {
     vec![GadgetType::Max, GadgetType::InputLookup]
   }
 }

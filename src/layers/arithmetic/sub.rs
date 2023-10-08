@@ -56,10 +56,17 @@ impl<F: PrimeField> Layer<F> for SubChip {
 
     Ok(vec![out])
   }
+
+  fn num_rows(&self, layer_config: &LayerConfig, num_cols: i64) -> i64 {
+    let inp_size = <SubChip as Arithmetic<F>>::get_inp_size(layer_config);
+
+    let num_sub_per_row = num_cols / 3;
+    (inp_size as i64).div_ceil(num_sub_per_row)
+  }
 }
 
 impl GadgetConsumer for SubChip {
-  fn used_gadgets(&self, _layer_params: Vec<i64>) -> Vec<crate::gadgets::gadget::GadgetType> {
+  fn used_gadgets(&self, _layer_config: &LayerConfig) -> Vec<crate::gadgets::gadget::GadgetType> {
     vec![GadgetType::SubPairs]
   }
 }

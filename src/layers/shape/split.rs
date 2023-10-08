@@ -38,10 +38,14 @@ impl<F: PrimeField> Layer<F> for SplitChip {
     }
     Ok(out)
   }
+
+  fn num_rows(&self, _layer_config: &LayerConfig, _num_cols: i64) -> i64 {
+    0
+  }
 }
 
 impl GadgetConsumer for SplitChip {
-  fn used_gadgets(&self, _layer_params: Vec<i64>) -> Vec<GadgetType> {
+  fn used_gadgets(&self, _layer_config: &LayerConfig) -> Vec<GadgetType> {
     vec![]
   }
 }

@@ -18,6 +18,7 @@ Cargo.lock
 # Proof stuff
 out.msgpack
 proof_size_check
+public_vals
 pkey
 vkey
 proof
@@ -27,3 +28,9 @@ params_ipa
 examples
 testing/data
 *.diff
+
+# log
+*.txt
+
+# bench file
+summary.msgpack

@@ -9,7 +9,7 @@ pub mod avg_pool_2d;
 pub mod batch_mat_mul;
 pub mod conv2d;
 pub mod div_fixed;
-pub mod fully_connected;
+pub mod fc;
 pub mod logistic;
 pub mod max_pool_2d;
 pub mod mean;

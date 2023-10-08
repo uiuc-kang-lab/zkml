@@ -8,7 +8,7 @@ use halo2_proofs::{
 
 use crate::{gadgets::gadget::GadgetConfig, utils::helpers::broadcast};
 
-use super::layer::{AssignedTensor, CellRc};
+use super::layer::{AssignedTensor, CellRc, LayerConfig};
 
 pub mod add;
 pub mod div_var;
@@ -16,6 +16,17 @@ pub mod mul;
 pub mod sub;
 
 pub trait Arithmetic<F: PrimeField> {
+  fn get_inp_size(layer_config: &LayerConfig) -> i64 {
+    let inp_size: usize = layer_config
+      .inp_shapes
+      .iter()
+      .map(|x| x.iter().product())
+      .max()
+      .unwrap();
+
+    inp_size as i64
+  }
+
   fn gadget_forward(
     &self,
     layouter: impl Layouter<F>,
@@ -34,7 +45,7 @@ pub trait Arithmetic<F: PrimeField> {
     assert_eq!(tensors.len(), 2);
     // println!("tensors: {:?} {:?}", tensors[0].shape(), tensors[1].shape());
     let (inp1, inp2) = broadcast(&tensors[0], &tensors[1]);
-    let out_shape = inp1.shape().clone();
+    let out_shape = inp1.shape();
     assert_eq!(inp1.shape(), inp2.shape());
 
     let zero = constants.get(&0).unwrap().as_ref();

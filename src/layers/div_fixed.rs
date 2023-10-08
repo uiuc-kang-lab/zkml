@@ -84,10 +84,16 @@ impl<F: PrimeField> Layer<F> for DivFixedChip {
 
     Ok(vec![out])
   }
+
+  fn num_rows(&self, layer_config: &LayerConfig, num_cols: i64) -> i64 {
+    let inp_size: usize = layer_config.inp_shapes[0].iter().product();
+    let num_inps_per_row = (num_cols - 1) / 3;
+    inp_size.div_ceil(num_inps_per_row as usize) as i64
+  }
 }
 
 impl GadgetConsumer for DivFixedChip {
-  fn used_gadgets(&self, _layer_params: Vec<i64>) -> Vec<crate::gadgets::gadget::GadgetType> {
+  fn used_gadgets(&self, _layer_config: &LayerConfig) -> Vec<crate::gadgets::gadget::GadgetType> {
     vec![GadgetType::VarDivRound]
   }
 }
