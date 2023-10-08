@@ -12,7 +12,7 @@ def parse_args():
 
 def create_estimation_dict():
     msg_dict = dict()
-    for bench in ["ipa_fft", "ipa_msm", "ipa_permute", "kzg_fft", "kzg_msm", "kzg_permute"]:
+    for bench in ["ipa_mul", "ipa_add", "ipa_fft", "ipa_msm", "ipa_permute", "kzg_mul", "kzg_add", "kzg_fft", "kzg_msm", "kzg_permute"]:
         path = os.path.join("target/criterion", bench, "k")
         sub_dirs = os.listdir(path)
         sub_dirs.remove("report")
@@ -24,11 +24,6 @@ def create_estimation_dict():
                 current_dict[sub_dir] = data["mean"]["point_estimate"]
         msg_dict[bench] = current_dict
 
-    for bench in ["ipa_mul", "kzg_mul"]:
-        path = os.path.join("target/criterion", bench, "new/estimates.json")
-        with open(path, "r") as f:
-            data = json.load(f)
-            msg_dict[bench] = data["mean"]["point_estimate"]
     return msg_dict
 
 def main():

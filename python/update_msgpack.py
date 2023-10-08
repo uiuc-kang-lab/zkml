@@ -14,8 +14,8 @@ def main():
   updated = False
   with open(args.model_input, "rb") as data_file:
       byte_data = data_file.read()
+      data_loaded = msgpack.unpackb(byte_data)
   
-  data_loaded = msgpack.unpackb(byte_data)
   if k != -1:
     data_loaded['k'] = k
     updated = True

@@ -31,7 +31,7 @@ pub fn bench_kzg_add(c: &mut Criterion) {
 
 criterion_group!{
     name=benches; 
-    config=Criterion::default().sample_size(10); 
+    config=Criterion::default(); 
     targets=bench_kzg_add
 }
 criterion_main!(benches);

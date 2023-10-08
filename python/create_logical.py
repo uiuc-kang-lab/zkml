@@ -33,10 +33,10 @@ def get_implementations():
     "BatchMatMul": [0],
     "Broadcast": [0],
     "Concatenation": [0],
-    "Conv2D": [0], # 0, 1, 2
+    "Conv2D": [0, 1, 2, 3, 4, 5],
     "Div": [0],
     "DivVar": [0],
-    "FullyConnected": [0, 1, 2],
+    "FullyConnected": [0, 1, 2, 3, 4, 5],
     "Logistic": [0],
     "MaskNegInf": [0],
     "MaxPool2D":[0],
