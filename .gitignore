@@ -34,3 +34,8 @@ testing/data
 
 # bench file
 summary.msgpack
+
+# data
+data
+exp
+exp_8x

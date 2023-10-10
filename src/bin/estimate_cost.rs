@@ -248,6 +248,8 @@ fn cost_estimator<F: halo2_proofs::arithmetic::Field>(k: u64, cs: ConstraintSyst
   let n_lookup: u64 = cs.lookups().len() as u64;
   let n_permutation: u64 = cs.permutation().get_columns().len() as u64;
   let (add_num, mul_num) = simulate_evaluate_h(k, cs);
+  println!("Add_num: {}", add_num);
+  println!("Mul_num: {}", mul_num);
 
   let mut time: f64 = 0.0;
   let k = k as i16;
@@ -474,7 +476,7 @@ fn main() -> Result<(), Error> {
   num_rows += blinding_factor;
   
   let k = (num_rows as f32).log2().ceil() as u64;
-  let k = circuit_cost_without_permutation(circuit.clone(), k);
+  //let k = circuit_cost_without_permutation(circuit.clone(), k);
   
   // Print out some stats
   let max_degree = cs.degree() as u64;

@@ -4,7 +4,7 @@ import argparse
 def main():
   parser = argparse.ArgumentParser()
   parser.add_argument("--model_input", type=str, required=True)
-  parser.add_argument("--config_input", type=str, required=True)
+  parser.add_argument("--config_input", type=str, default=None)
   parser.add_argument("--c", type=int, default=-1)
   parser.add_argument("--k", type=int, default=-1)
   args = parser.parse_args()
@@ -29,9 +29,10 @@ def main():
         outfile.write(packed)
     
     data_loaded['tensors'] = []
-    with open(args.config_input, "wb") as outfile:
-        config_packed = msgpack.packb(data_loaded, use_bin_type=True)
-        outfile.write(config_packed)
+    if args.config_input is not None:
+      with open(args.config_input, "wb") as outfile:
+          config_packed = msgpack.packb(data_loaded, use_bin_type=True)
+          outfile.write(config_packed)
 
 if __name__ == '__main__':
   main()

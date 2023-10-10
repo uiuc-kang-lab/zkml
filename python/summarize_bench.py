@@ -15,7 +15,8 @@ def create_estimation_dict():
     for bench in ["ipa_mul", "ipa_add", "ipa_fft", "ipa_msm", "ipa_permute", "kzg_mul", "kzg_add", "kzg_fft", "kzg_msm", "kzg_permute"]:
         path = os.path.join("target/criterion", bench, "k")
         sub_dirs = os.listdir(path)
-        sub_dirs.remove("report")
+        if "report" in sub_dirs:
+            sub_dirs.remove("report")
         sub_dirs.sort()
         current_dict = dict()
         for sub_dir in sub_dirs:
