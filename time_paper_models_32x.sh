@@ -14,8 +14,12 @@ rm pkey
 ./target/release/time_circuit data/mobilenet_1.4/model_40.msgpack data/mobilenet_1.4/example_inp.msgpack ipa > data/mobilenet_1.4/model_40_ipa.txt
 rm pkey
 
-#./target/release/time_circuit data/cifar10/model_best.msgpack data/cifar10/example_inp.msgpack ipa
-#./target/release/time_circuit data/cifar10/model_40.msgpack data/cifar10/example_inp.msgpack ipa
+# gpt best: | k=24 | c=25 | i=0
+./target/release/time_circuit data/gpt2/model_best.msgpack data/gpt2/example_inp.msgpack ipa > data/gpt2/model_best_ipa.txt
+rm pkey
+# gpt 40: | k=24 | c=40 | i=0
+./target/release/time_circuit data/gpt2/model_best.msgpack data/gpt2/example_inp.msgpack ipa > data/gpt2/model_40_ipa.txt
+rm pkey
 
 # kzg
 
@@ -24,4 +28,11 @@ rm pkey
 rm pkey
 # mobilenet_1.4 40: estimated_time=8760.331 | row=9142025 | k=24 | c=40 | i=0
 ./target/release/time_circuit data/mobilenet_1.4/model_40.msgpack data/mobilenet_1.4/example_inp.msgpack kzg > data/mobilenet_1.4/model_40_kzg.txt
+rm pkey
+
+# gpt best: | k=24 | c=25 | i=0
+./target/release/time_circuit data/gpt2/model_best.msgpack data/gpt2/example_inp.msgpack ipa > data/gpt2/model_best_kzg.txt
+rm pkey
+# gpt 40: | k=24 | c=40 | i=0
+./target/release/time_circuit data/gpt2/model_best.msgpack data/gpt2/example_inp.msgpack ipa > data/gpt2/model_40_kzg.txt
 rm pkey
