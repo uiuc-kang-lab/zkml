@@ -6,6 +6,8 @@ use crate::gadgets::gadget::GadgetConfig;
 
 use super::layer::{AssignedTensor, CellRc, GadgetConsumer, Layer, LayerConfig};
 
+use ndarray::{Array, IxDyn};
+
 pub struct NoopChip {}
 
 impl<F: PrimeField> Layer<F> for NoopChip {
@@ -18,7 +20,18 @@ impl<F: PrimeField> Layer<F> for NoopChip {
     layer_config: &LayerConfig,
   ) -> Result<Vec<AssignedTensor<F>>, Error> {
     let ret_idx = layer_config.layer_params[0] as usize;
-    Ok(vec![tensors[ret_idx].clone()])
+    let out_shape = layer_config.out_shapes[0].clone();
+    let len_out = out_shape.iter().product();
+
+    let unshaped_tensor = tensors[ret_idx].clone();
+    let mut inp_flat = unshaped_tensor.iter().cloned().collect::<Vec<_>>();
+    if inp_flat.len() > len_out {
+      inp_flat = inp_flat[..len_out].into_iter().cloned().collect::<Vec<_>>();
+    } 
+
+    let shaped_tensor = Array::from_shape_vec(IxDyn(&out_shape), inp_flat).unwrap();
+
+    Ok(vec![shaped_tensor])
   }
 
   fn num_rows(&self, _layer_config: &LayerConfig, _num_cols: i64) -> i64 {

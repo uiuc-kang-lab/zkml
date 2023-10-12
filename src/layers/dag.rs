@@ -452,25 +452,25 @@ impl<F: PrimeField + Ord> DAGLayerChip<F> {
       }
     };
 
-    let tmp = print_arr.iter().map(|x| x.as_ref()).collect::<Vec<_>>();
-    print_assigned_arr("final out", &tmp.to_vec(), gadget_config.scale_factor);
-    println!("final out idxes: {:?}", self.dag_config.final_out_idxes);
+    //let tmp = print_arr.iter().map(|x| x.as_ref()).collect::<Vec<_>>();
+    //print_assigned_arr("final out", &tmp.to_vec(), gadget_config.scale_factor);
+    //println!("final out idxes: {:?}", self.dag_config.final_out_idxes);
 
-    let mut x = vec![];
-    for cell in print_arr.iter() {
-      cell.value().map(|v| {
-        let bias = 1 << 60 as i64;
-        let v_pos = *v + F::from(bias as u64);
-        let v = convert_to_u64(&v_pos) as i64 - bias;
-        x.push(v);
-      });
-    }
-    if x.len() > 0 {
-      let out_fname = "out.msgpack";
-      let f = File::create(out_fname).unwrap();
-      let mut buf = BufWriter::new(f);
-      rmp_serde::encode::write_named(&mut buf, &x).unwrap();
-    }
+    //let mut x = vec![];
+    //for cell in print_arr.iter() {
+    //  cell.value().map(|v| {
+    //    let bias = 1 << 60 as i64;
+    //    let v_pos = *v + F::from(bias as u64);
+    //    let v = convert_to_u64(&v_pos) as i64 - bias;
+    //    x.push(v);
+    //  });
+    //}
+    //if x.len() > 0 {
+    //  let out_fname = "out.msgpack";
+    //  let f = File::create(out_fname).unwrap();
+    //  let mut buf = BufWriter::new(f);
+    //  rmp_serde::encode::write_named(&mut buf, &x).unwrap();
+    //}
 
     Ok((tensor_map, final_out))
   }
