@@ -15,10 +15,10 @@ export MEASURE=1
 #rm pkey
 
 # gpt best: | k=24 | c=25 | i=0
-./target/release/time_circuit data/gpt2/model_best_ipa.msgpack data/gpt2/inp.msgpack ipa > data/gpt2/model_best_ipa.txt
+./target/release/time_circuit data/gpt2/model_best_ipa.msgpack data/gpt2/inp_ipa.msgpack ipa > data/gpt2/model_best_ipa.txt
 rm pkey
 # gpt 40: | k=24 | c=40 | i=0
-./target/release/time_circuit data/gpt2/model_40.msgpack data/gpt2/inp.msgpack ipa > data/gpt2/model_40_ipa.txt
+./target/release/time_circuit data/gpt2/model_40.msgpack data/gpt2/inp_40.msgpack ipa > data/gpt2/model_40_ipa.txt
 rm pkey
 
 # kzg
@@ -31,8 +31,8 @@ rm pkey
 #rm pkey
 
 # gpt best: | k=24 | c=25 | i=0
-./target/release/time_circuit data/gpt2/model_best_kzg.msgpack data/gpt2/inp.msgpack kzg > data/gpt2/model_best_kzg.txt
+./target/release/time_circuit data/gpt2/model_best_kzg.msgpack data/gpt2/inp_kzg.msgpack kzg > data/gpt2/model_best_kzg.txt
 rm pkey
 # gpt 40: | k=24 | c=40 | i=0
-./target/release/time_circuit data/gpt2/model_40.msgpack data/gpt2/inp.msgpack kzg > data/gpt2/model_40_kzg.txt
+./target/release/time_circuit data/gpt2/model_40.msgpack data/gpt2/inp_40.msgpack kzg > data/gpt2/model_40_kzg.txt
 rm pkey
