@@ -40,17 +40,17 @@ do
     fi
     #echo "### estimated_time=$estimated_time_sec | row=$estimated_row | k=$estimated_k | c=$c | i=$i"
     # Real Proving with Halo2...
-    #for j in $( seq 0 1 )
-    #do
-    output=$(./target/release/time_circuit ${working_dir}/model_${i}.msgpack ${working_dir}/example_inp.msgpack ${commitment})
-    if [[ $output =~ Proving\ time:\ ([0-9]+\.[0-9]+) ]]; then
-        proving_time=${BASH_REMATCH[1]}
-        proving_time_sec=$(echo "scale=2; $proving_time / 1" | bc)
-    fi
-    echo "$output" >> ${working_dir}/proving.txt
-    #echo "$commitment $i $c $proving_time_sec" "$estimated_time_sec" >> ${working_dir}/my_exp.txt
-    echo "### estimated_time=$estimated_time_sec | proving_time=$proving_time_sec | row=$estimated_row | k=$estimated_k | c=$c | i=$i"
-    #done
+    for j in $( seq 0 5 )
+    do
+      output=$(./target/release/time_circuit ${working_dir}/model_${i}.msgpack ${working_dir}/example_inp.msgpack ${commitment})
+      if [[ $output =~ Proving\ time:\ ([0-9]+\.[0-9]+) ]]; then
+          proving_time=${BASH_REMATCH[1]}
+          proving_time_sec=$(echo "scale=2; $proving_time / 1" | bc)
+      fi
+      echo "$output" >> ${working_dir}/proving.txt
+      #echo "$commitment $i $c $proving_time_sec" "$estimated_time_sec" >> ${working_dir}/my_exp.txt
+      echo "### estimated_time=$estimated_time_sec | proving_time=$proving_time_sec | row=$estimated_row | k=$estimated_k | c=$c | i=$i"
+    done
   done
 done
 echo "Best msgpack: $best_msgpack when c=$best_c"
