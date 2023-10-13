@@ -12,7 +12,7 @@ python python/create_logical.py --model ${working_dir}/model.tflite --model_outp
 n=$(ls ${working_dir} | egrep "config_d*" | wc -l)
 n=$(( $n - 1 ))
 echo "n=$n"
-for c in $(seq 10 1 140)
+for c in $(seq 10 1 100)
 do
   for i in $( seq 0 $n )
   do
@@ -38,17 +38,18 @@ do
       #echo "estimated_k=$estimated_k"
       python python/update_msgpack.py --model_input ${working_dir}/model_${i}.msgpack --config_input ${working_dir}/config_${i}.msgpack --k ${estimated_k}
     fi
-    echo "### estimated_time=$estimated_time_sec | row=$estimated_row | k=$estimated_k | c=$c | i=$i"
+    #echo "### estimated_time=$estimated_time_sec | row=$estimated_row | k=$estimated_k | c=$c | i=$i"
     # Real Proving with Halo2...
     #for j in $( seq 0 1 )
     #do
-    #output=$(./target/release/time_circuit ${working_dir}/model_${i}.msgpack ${working_dir}/example_inp.msgpack ${commitment})
-    #if [[ $output =~ Proving\ time:\ ([0-9]+\.[0-9]+) ]]; then
-    #    proving_time=${BASH_REMATCH[1]}
-    #    proving_time_sec=$(echo "scale=2; $proving_time / 1" | bc)
-    #fi
-    #echo "$output" >> ${working_dir}/proving.txt
+    output=$(./target/release/time_circuit ${working_dir}/model_${i}.msgpack ${working_dir}/example_inp.msgpack ${commitment})
+    if [[ $output =~ Proving\ time:\ ([0-9]+\.[0-9]+) ]]; then
+        proving_time=${BASH_REMATCH[1]}
+        proving_time_sec=$(echo "scale=2; $proving_time / 1" | bc)
+    fi
+    echo "$output" >> ${working_dir}/proving.txt
     #echo "$commitment $i $c $proving_time_sec" "$estimated_time_sec" >> ${working_dir}/my_exp.txt
+    echo "### estimated_time=$estimated_time_sec | proving_time=$proving_time_sec | row=$estimated_row | k=$estimated_k | c=$c | i=$i"
     #done
   done
 done
