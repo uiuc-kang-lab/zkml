@@ -7,7 +7,7 @@ best_msgpack=""
 best_time=9999999999999999999999999999.99
 best_c=0
 
-python python/create_logical.py --model ${working_dir}/model.tflite --model_output_dir ${working_dir} --config_output_dir ${working_dir} --scale_factor 512 --num_randoms ${num_randoms}
+python3 python/create_logical.py --model ${working_dir}/model.tflite --model_output_dir ${working_dir} --config_output_dir ${working_dir} --scale_factor 512 --num_randoms ${num_randoms}
 
 n=$(ls ${working_dir} | egrep "config_d*" | wc -l)
 n=$(( $n - 1 ))
@@ -16,8 +16,8 @@ for c in $(seq 10 1 100)
 do
   for i in $( seq 0 $n )
   do
-    python python/update_msgpack.py --model_input ${working_dir}/model_${i}.msgpack --config_input ${working_dir}/config_${i}.msgpack --c ${c}
-    python python/fake_input_converter.py --model_config ${working_dir}/model_${i}.msgpack --output ${working_dir}/example_inp.msgpack
+    python3 python/update_msgpack.py --model_input ${working_dir}/model_${i}.msgpack --config_input ${working_dir}/config_${i}.msgpack --c ${c}
+    python3 python/fake_input_converter.py --model_config ${working_dir}/model_${i}.msgpack --output ${working_dir}/example_inp.msgpack
     output=$(./target/release/estimate_cost ${working_dir}/model_${i}.msgpack ${working_dir}/example_inp.msgpack ${commitment})
     echo "$output" >> ${working_dir}/estimation.txt
     if [[ $output =~ Total\ time\ cost\ \(esitmated\):\ ([0-9]+\.[0-9]+) ]]; then
@@ -36,7 +36,7 @@ do
     if [[ $output =~ Optimal\ k:\ ([0-9]+) ]]; then
       estimated_k=${BASH_REMATCH[1]}
       #echo "estimated_k=$estimated_k"
-      python python/update_msgpack.py --model_input ${working_dir}/model_${i}.msgpack --config_input ${working_dir}/config_${i}.msgpack --k ${estimated_k}
+      python3 python/update_msgpack.py --model_input ${working_dir}/model_${i}.msgpack --config_input ${working_dir}/config_${i}.msgpack --k ${estimated_k}
     fi
     #echo "### estimated_time=$estimated_time_sec | row=$estimated_row | k=$estimated_k | c=$c | i=$i"
     # Real Proving with Halo2...
