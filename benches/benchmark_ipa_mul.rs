@@ -11,7 +11,7 @@ use rand_core::OsRng;
 
 pub fn bench_ipa_mul(c: &mut Criterion) {
     let mut group = c.benchmark_group("ipa_mul");
-    for k in 15..28 {
+    for k in 13..20 {
         let extended_len = 1 << k;
         let mut rand_ext_vec: Vec<vesta::Scalar> = (0..extended_len)
             .map(|_| vesta::Scalar::random(OsRng))
