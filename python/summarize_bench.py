@@ -36,7 +36,7 @@ def main():
         f.write(summary_packed)
 
     if args.show_plot:
-        for bench in ["ipa_fft", "ipa_msm", "ipa_permute", "kzg_fft", "kzg_msm", "kzg_permute"]:
+        for bench in ["ipa_fft", "ipa_msm", "ipa_mul", "ipa_add", "ipa_permute", "kzg_fft", "kzg_msm", "kzg_mul", "kzg_add","kzg_permute"]:
             x = []
             y = []
             for k in d[bench]:
