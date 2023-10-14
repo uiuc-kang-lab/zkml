@@ -98,17 +98,17 @@ export MEASURE=1
 
 #./target/release/time_circuit data/mnist/model_40_w.msgpack data/mnist/example_inp_40_w.msgpack ipa > data/mnist/model_40_w_ipa.txt
 #./target/release/time_circuit data/mnist/model_best_w.msgpack data/mnist/example_inp_w.msgpack ipa > data/mnist/model_best_w_ipa.txt
-./target/release/time_circuit data/mnist/model_best_diff_w.msgpack data/mnist/example_inp_diff_w.msgpack ipa > data/mnist/model_best_diff_w_ipa.txt
+#./target/release/time_circuit data/mnist/model_best_diff_w.msgpack data/mnist/example_inp_diff_w.msgpack ipa > data/mnist/model_best_diff_w_ipa.txt
 #./target/release/time_circuit data/mnist/model_40_wo.msgpack data/mnist/example_inp_40_wo.msgpack ipa > data/mnist/model_40_wo_ipa.txt
 #./target/release/time_circuit data/mnist/model_best_wo.msgpack data/mnist/example_inp_wo.msgpack ipa > data/mnist/model_best_wo_ipa.txt
-./target/release/time_circuit data/mnist/model_best_diff_wo.msgpack data/mnist/example_inp_diff_wo.msgpack ipa > data/mnist/model_best_diff_wo_ipa.txt
+#./target/release/time_circuit data/mnist/model_best_diff_wo.msgpack data/mnist/example_inp_diff_wo.msgpack ipa > data/mnist/model_best_diff_wo_ipa.txt
 
 #./target/release/time_circuit data/mnist/model_40_w.msgpack data/mnist/example_inp_40_w.msgpack kzg > data/mnist/model_40_w_kzg.txt
 #./target/release/time_circuit data/mnist/model_best_w.msgpack data/mnist/example_inp_w.msgpack kzg > data/mnist/model_best_w_kzg.txt
-./target/release/time_circuit data/mnist/model_best_diff_w.msgpack data/mnist/example_inp_diff_w.msgpack kzg > data/mnist/model_best_diff_w_kzg.txt
+#./target/release/time_circuit data/mnist/model_best_diff_w.msgpack data/mnist/example_inp_diff_w.msgpack kzg > data/mnist/model_best_diff_w_kzg.txt
 #./target/release/time_circuit data/mnist/model_40_wo.msgpack data/mnist/example_inp_40_wo.msgpack kzg > data/mnist/model_40_wo_kzg.txt
 #./target/release/time_circuit data/mnist/model_best_wo.msgpack data/mnist/example_inp_wo.msgpack kzg > data/mnist/model_best_wo_kzg.txt
-./target/release/time_circuit data/mnist/model_best_diff_wo.msgpack data/mnist/example_inp_diff_wo.msgpack kzg > data/mnist/model_best_diff_wo_kzg.txt
+#./target/release/time_circuit data/mnist/model_best_diff_wo.msgpack data/mnist/example_inp_diff_wo.msgpack kzg > data/mnist/model_best_diff_wo_kzg.txt
 
 # vgg16 best: estimated_time=1292.510 | row=4190314 | k=22 | c=16 | i=1
 #./target/release/time_circuit data/vgg16/model_best.msgpack data/vgg16/example_inp.msgpack ipa > data/vgg16/model_best_ipa.txt
@@ -123,5 +123,26 @@ export MEASURE=1
 # vgg16 40: estimated_time=2381.989 | row=2308604 | k=22 | c=40 | i=1
 #./target/release/time_circuit data/vgg16/model_40.msgpack data/vgg16/example_inp_40.msgpack kzg > data/vgg16/model_40_kzg.txt
 #rm pkey
+
+./target/release/time_circuit data/mobilebert/model_best.msgpack data/mobilebert/example_inp.msgpack ipa > data/mobilebert/model_best_ipa.txt
+rm pkey
+./target/release/time_circuit data/mobilebert/model_40.msgpack data/mobilebert/example_inp.msgpack ipa > data/mobilebert/model_40_ipa.txt
+rm pkey
+
+./target/release/time_circuit data/mobilebert/model_best.msgpack data/mobilebert/example_inp.msgpack kzg > data/mobilebert/model_best_kzg.txt
+rm pkey
+./target/release/time_circuit data/mobilebert/model_40.msgpack data/mobilebert/example_inp.msgpack kzg > data/mobilebert/model_40_kzg.txt
+rm pkey
+
+./target/release/time_circuit data/diffusion/model_best.msgpack data/diffusion/example_inp.msgpack ipa > data/diffusion/model_best_ipa.txt
+rm pkey
+./target/release/time_circuit data/diffusion/model_40.msgpack data/diffusion/example_inp.msgpack ipa > data/diffusion/model_40_ipa.txt
+rm pkey
+
+./target/release/time_circuit data/diffusion/model_best.msgpack data/diffusion/example_inp.msgpack kzg > data/diffusion/model_best_kzg.txt
+rm pkey
+./target/release/time_circuit data/diffusion/model_40.msgpack data/diffusion/example_inp.msgpack kzg > data/diffusion/model_40_kzg.txt
+rm pkey
+
 
 curl -d "AWS: benchmark paper models successfully complete" ntfy.sh/bjchen4
