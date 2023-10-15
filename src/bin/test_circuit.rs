@@ -20,4 +20,5 @@ fn main() {
 
   let prover = MockProver::run(config.k.try_into().unwrap(), &circuit, vec![public_vals]).unwrap();
   assert_eq!(prover.verify(), Ok(()));
+  println!("Proof verified!")
 }

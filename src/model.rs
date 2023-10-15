@@ -30,7 +30,7 @@ use crate::{
     input_lookup::InputLookupChip,
     max::MaxChip,
     mul_pairs::MulPairsChip,
-    nonlinear::{exp::ExpGadgetChip, pow::PowGadgetChip, relu::ReluChip, tanh::TanhGadgetChip},
+    nonlinear::{cos::CosGadgetChip, exp::ExpGadgetChip, pow::PowGadgetChip, relu::ReluChip, tanh::TanhGadgetChip, sin::SinGadgetChip},
     nonlinear::{
       logistic::LogisticGadgetChip, relu_decompose::ReluDecomposeChip, rsqrt::RsqrtGadgetChip,
       sqrt::SqrtGadgetChip,
@@ -49,6 +49,7 @@ use crate::{
     avg_pool_2d::AvgPool2DChip,
     batch_mat_mul::BatchMatMulChip,
     conv2d::Conv2DChip,
+    cos::CosChip,
     dag::{DAGLayerChip, DAGLayerConfig},
     fc::fully_connected::{FullyConnectedChip, FullyConnectedConfig},
     layer::{AssignedTensor, CellRc, GadgetConsumer, LayerConfig, LayerType},
@@ -64,6 +65,7 @@ use crate::{
       resize_nn::ResizeNNChip, rotate::RotateChip, slice::SliceChip, split::SplitChip,
       transpose::TransposeChip,
     },
+    sin::SinChip,
     softmax::SoftmaxChip,
     sqrt::SqrtChip,
     square::SquareChip,
@@ -312,6 +314,7 @@ impl<F: PrimeField + Ord + FromUniformBytes<64>> ModelCircuit<F> {
       "Broadcast" => LayerType::Broadcast,
       "Concatenation" => LayerType::Concatenation,
       "Conv2D" => LayerType::Conv2D,
+      "Cos" => LayerType::Cos,
       "Div" => LayerType::DivFixed, // TODO: rename to DivFixed
       "DivVar" => LayerType::DivVar,
       "FullyConnected" => LayerType::FullyConnected,
@@ -329,6 +332,7 @@ impl<F: PrimeField + Ord + FromUniformBytes<64>> ModelCircuit<F> {
       "ResizeNearestNeighbor" => LayerType::ResizeNN,
       "Rotate" => LayerType::Rotate,
       "Rsqrt" => LayerType::Rsqrt,
+      "Sin" => LayerType::Sin,
       "Slice" => LayerType::Slice,
       "Softmax" => LayerType::Softmax,
       "Split" => LayerType::Split,
@@ -384,6 +388,7 @@ impl<F: PrimeField + Ord + FromUniformBytes<64>> ModelCircuit<F> {
             LayerType::BatchMatMul => Box::new(BatchMatMulChip {}) as Box<dyn GadgetConsumer>,
             LayerType::Broadcast => Box::new(BroadcastChip {}) as Box<dyn GadgetConsumer>,
             LayerType::Concatenation => Box::new(ConcatenationChip {}) as Box<dyn GadgetConsumer>,
+            LayerType::Cos => Box::new(CosChip {}) as Box<dyn GadgetConsumer>,
             LayerType::DivFixed => Box::new(ConcatenationChip {}) as Box<dyn GadgetConsumer>,
             LayerType::DivVar => Box::new(DivVarChip {}) as Box<dyn GadgetConsumer>,
             LayerType::Conv2D => Box::new(Conv2DChip {
@@ -410,6 +415,7 @@ impl<F: PrimeField + Ord + FromUniformBytes<64>> ModelCircuit<F> {
             LayerType::ResizeNN => Box::new(ResizeNNChip {}) as Box<dyn GadgetConsumer>,
             LayerType::Rotate => Box::new(RotateChip {}) as Box<dyn GadgetConsumer>,
             LayerType::Rsqrt => Box::new(RsqrtChip {}) as Box<dyn GadgetConsumer>,
+            LayerType::Sin => Box::new(SinChip {}) as Box<dyn GadgetConsumer>,
             LayerType::Slice => Box::new(SliceChip {}) as Box<dyn GadgetConsumer>,
             LayerType::Softmax => Box::new(SoftmaxChip {}) as Box<dyn GadgetConsumer>,
             LayerType::Split => Box::new(SplitChip {}) as Box<dyn GadgetConsumer>,
@@ -599,6 +605,7 @@ impl<F: PrimeField + Ord + FromUniformBytes<64>> Circuit<F> for ModelCircuit<F> 
         GadgetType::Adder => AdderChip::<F>::configure(meta, gadget_config),
         GadgetType::BiasDivRoundRelu6 => BiasDivRoundRelu6Chip::<F>::configure(meta, gadget_config),
         GadgetType::BiasDivFloorRelu6 => panic!(),
+        GadgetType::Cos => CosGadgetChip::<F>::configure(meta, gadget_config),
         GadgetType::DotProduct => DotProductChip::<F>::configure(meta, gadget_config),
         GadgetType::DotProductBias => DotProductBiasChip::<F>::configure(meta, gadget_config),
         GadgetType::Exp => ExpGadgetChip::<F>::configure(meta, gadget_config),
@@ -609,6 +616,7 @@ impl<F: PrimeField + Ord + FromUniformBytes<64>> Circuit<F> for ModelCircuit<F> 
         GadgetType::Relu => ReluChip::<F>::configure(meta, gadget_config),
         GadgetType::ReluDecompose => ReluDecomposeChip::<F>::configure(meta, gadget_config),
         GadgetType::Rsqrt => RsqrtGadgetChip::<F>::configure(meta, gadget_config),
+        GadgetType::Sin => SinGadgetChip::<F>::configure(meta, gadget_config),
         GadgetType::Sqrt => SqrtGadgetChip::<F>::configure(meta, gadget_config),
         GadgetType::SqrtBig => SqrtBigChip::<F>::configure(meta, gadget_config),
         GadgetType::Square => SquareGadgetChip::<F>::configure(meta, gadget_config),
@@ -668,6 +676,10 @@ impl<F: PrimeField + Ord + FromUniformBytes<64>> Circuit<F> for ModelCircuit<F> 
           let chip = BiasDivRoundRelu6Chip::<F>::construct(gadget_rc.clone());
           chip.load_lookups(layouter.namespace(|| "bias div round relu6 lookup"))?;
         }
+        GadgetType::Cos => {
+          let chip = CosGadgetChip::<F>::construct(gadget_rc.clone());
+          chip.load_lookups(layouter.namespace(|| "cos lookup"))?;
+        }
         GadgetType::DotProduct => {
           let chip = DotProductChip::<F>::construct(gadget_rc.clone());
           chip.load_lookups(layouter.namespace(|| "dot product lookup"))?;
@@ -695,6 +707,10 @@ impl<F: PrimeField + Ord + FromUniformBytes<64>> Circuit<F> for ModelCircuit<F> 
         GadgetType::Rsqrt => {
           let chip = RsqrtGadgetChip::<F>::construct(gadget_rc.clone());
           chip.load_lookups(layouter.namespace(|| "rsqrt lookup"))?;
+        }
+        GadgetType::Sin => {
+          let chip = SinGadgetChip::<F>::construct(gadget_rc.clone());
+          chip.load_lookups(layouter.namespace(|| "sin lookup"))?;
         }
         GadgetType::Sqrt => {
           let chip = SqrtGadgetChip::<F>::construct(gadget_rc.clone());

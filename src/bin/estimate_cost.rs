@@ -17,6 +17,7 @@ use zkml::{
     avg_pool_2d::AvgPool2DChip,
     batch_mat_mul::BatchMatMulChip,
     conv2d::Conv2DChip,
+    cos::CosChip,
     div_fixed::DivFixedChip,
     fc::fully_connected::{FullyConnectedChip, FullyConnectedConfig},
     layer::{Layer, LayerType},
@@ -32,6 +33,7 @@ use zkml::{
       resize_nn::ResizeNNChip, rotate::RotateChip, slice::SliceChip, split::SplitChip,
       transpose::TransposeChip,
     },
+    sin::SinChip,
     softmax::SoftmaxChip,
     sqrt::SqrtChip,
     square::SquareChip,
@@ -39,6 +41,7 @@ use zkml::{
     tanh::TanhChip,
     update::UpdateChip,
   },
+  utils::loader::load_config_msgpack,
   model::{ModelCircuit, GADGET_CONFIG},
 };
 
@@ -301,6 +304,8 @@ fn main() -> Result<(), Error> {
   }
 
   let circuit = ModelCircuit::<Fr>::generate_from_file(&config_fname, &inp_fname);
+  //let config = load_config_msgpack(&config_fname);
+  //let circuit = ModelCircuit::<Fr>::generate_from_msgpack(config, false);
 
   let num_cols = GADGET_CONFIG.lock().unwrap().num_cols as i64;
   println!("Num cols: {}", num_cols);
@@ -349,6 +354,10 @@ fn main() -> Result<(), Error> {
           _marker: PhantomData,
         };
         <Conv2DChip<Fr> as Layer<Fr>>::num_rows(&chip, &layer_config, num_cols)
+      }
+      LayerType::Cos => {
+        let chip = CosChip {};
+        <CosChip as Layer<Fr>>::num_rows(&chip, &layer_config, num_cols)
       }
       LayerType::DivFixed => {
         let chip = DivFixedChip {};
@@ -422,6 +431,10 @@ fn main() -> Result<(), Error> {
       LayerType::Rsqrt => {
         let chip = RsqrtChip {};
         <RsqrtChip as Layer<Fr>>::num_rows(&chip, &layer_config, num_cols)
+      }
+      LayerType::Sin => {
+        let chip = SinChip {};
+        <SinChip as Layer<Fr>>::num_rows(&chip, &layer_config, num_cols)
       }
       LayerType::Slice => {
         let chip = SliceChip {};

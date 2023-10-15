@@ -7,6 +7,7 @@ use crate::{
   layers::{
     arithmetic::{add::AddChip, div_var::DivVarChip, mul::MulChip, sub::SubChip},
     batch_mat_mul::BatchMatMulChip,
+    cos::CosChip,
     div_fixed::DivFixedChip,
     fc::fully_connected::{FullyConnectedChip, FullyConnectedConfig},
     logistic::LogisticChip,
@@ -21,6 +22,7 @@ use crate::{
       resize_nn::ResizeNNChip, rotate::RotateChip, slice::SliceChip, split::SplitChip,
       transpose::TransposeChip,
     },
+    sin::SinChip,
     softmax::SoftmaxChip,
     sqrt::SqrtChip,
     square::SquareChip,
@@ -147,6 +149,16 @@ impl<F: PrimeField + Ord> DAGLayerChip<F> {
           };
           conv_2d_chip.forward(
             layouter.namespace(|| "dag conv 2d"),
+            &vec_inps,
+            constants,
+            gadget_config.clone(),
+            &layer_config,
+          )?
+        }
+        LayerType::Cos => {
+          let cos_chip = CosChip {};
+          cos_chip.forward(
+            layouter.namespace(|| "dag cos"),
             &vec_inps,
             constants,
             gadget_config.clone(),
@@ -290,6 +302,16 @@ impl<F: PrimeField + Ord> DAGLayerChip<F> {
           let mul_chip = MulChip {};
           mul_chip.forward(
             layouter.namespace(|| "dag mul"),
+            &vec_inps,
+            constants,
+            gadget_config.clone(),
+            &layer_config,
+          )?
+        }
+        LayerType::Sin => {
+          let sin_chip = SinChip {};
+          sin_chip.forward(
+            layouter.namespace(|| "dag sin"),
             &vec_inps,
             constants,
             gadget_config.clone(),

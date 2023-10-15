@@ -9,6 +9,7 @@ use zkml::{
     avg_pool_2d::AvgPool2DChip,
     batch_mat_mul::BatchMatMulChip,
     conv2d::Conv2DChip,
+    cos::CosChip,
     div_fixed::DivFixedChip,
     fc::fully_connected::{FullyConnectedChip, FullyConnectedConfig},
     layer::{Layer, LayerType},
@@ -24,6 +25,7 @@ use zkml::{
       resize_nn::ResizeNNChip, rotate::RotateChip, slice::SliceChip, split::SplitChip,
       transpose::TransposeChip,
     },
+    sin::SinChip,
     softmax::SoftmaxChip,
     sqrt::SqrtChip,
     square::SquareChip,
@@ -85,6 +87,10 @@ fn main() {
           _marker: PhantomData,
         };
         <Conv2DChip<Fr> as Layer<Fr>>::num_rows(&chip, &layer_config, num_cols)
+      }
+      LayerType::Cos => {
+        let chip = CosChip {};
+        <CosChip as Layer<Fr>>::num_rows(&chip, &layer_config, num_cols)
       }
       LayerType::DivFixed => {
         let chip = DivFixedChip {};
@@ -158,6 +164,10 @@ fn main() {
       LayerType::Rsqrt => {
         let chip = RsqrtChip {};
         <RsqrtChip as Layer<Fr>>::num_rows(&chip, &layer_config, num_cols)
+      }
+      LayerType::Sin => {
+        let chip = SinChip {};
+        <SinChip as Layer<Fr>>::num_rows(&chip, &layer_config, num_cols)
       }
       LayerType::Slice => {
         let chip = SliceChip {};
