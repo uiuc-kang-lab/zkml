@@ -43,3 +43,5 @@ rm pkey
 
 ./target/release/time_circuit data/mobilebert/model_best.msgpack data/mobilebert/example_inp.msgpack kzg > data/mobilebert/model_best_kzg.txt
 rm pkey
+
+curl -d "AWS: benchmark paper models successfully complete" ntfy.sh/bjchen4
