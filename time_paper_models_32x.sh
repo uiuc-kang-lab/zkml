@@ -38,10 +38,10 @@ export MEASURE=1
 #./target/release/time_circuit data/gpt2/model_40.msgpack data/gpt2/inp_40.msgpack kzg > data/gpt2/model_40_kzg.txt
 #rm pkey
 
-./target/release/time_circuit data/mobilebert/model_best.msgpack data/mobilebert/example_inp.msgpack ipa > data/mobilebert/model_best_ipa.txt
+./target/release/time_circuit data/diffusion/model_best.msgpack data/diffusion/example_inp.msgpack ipa > data/diffusion/model_best_ipa.txt
 rm pkey
 
-./target/release/time_circuit data/mobilebert/model_best.msgpack data/mobilebert/example_inp.msgpack kzg > data/mobilebert/model_best_kzg.txt
+./target/release/time_circuit data/diffusion/model_best.msgpack data/diffusion/example_inp.msgpack kzg > data/diffusion/model_best_kzg.txt
 rm pkey
 
 curl -d "AWS: benchmark paper models successfully complete" ntfy.sh/bjchen4
