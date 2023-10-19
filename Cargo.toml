@@ -1,11 +1,11 @@
 [package]
-name = "zkml"
+name = "sysx"
 version = "0.0.1"
 edition = "2021"
 description = "Zero-knowledge machine learning"
 license = "LICENSE"
-homepage = "https://github.com/ddkang/zkml"
-repository = "https://github.com/ddkang/zkml-public.git"
+homepage = "https://github.com/ddkang/sysx"
+repository = "https://github.com/ddkang/sysx-public.git"
 readme = "README.md"
 exclude = [
   "params",
