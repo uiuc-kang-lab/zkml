@@ -1,5 +1,5 @@
 use halo2_proofs::halo2curves::{bn256::Fr, pasta::Fp};
-use zkml::{
+use sysx::{
   model::ModelCircuit,
   utils::{proving_ipa::time_circuit_ipa, proving_kzg::time_circuit_kzg},
 };

@@ -1,5 +1,5 @@
 use halo2_proofs::halo2curves::bn256::Fr;
-use zkml::{
+use sysx::{
   model::ModelCircuit,
   utils::{loader::load_config_msgpack, proving_kzg::verify_circuit_kzg},
 };

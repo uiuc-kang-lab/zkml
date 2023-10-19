@@ -1,5 +1,5 @@
 use halo2_proofs::{dev::MockProver, halo2curves::bn256::Fr};
-use zkml::{
+use sysx::{
   model::ModelCircuit,
   utils::{
     helpers::get_public_values,

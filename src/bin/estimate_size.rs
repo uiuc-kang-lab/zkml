@@ -3,7 +3,7 @@
 use std::marker::PhantomData;
 
 use halo2_proofs::halo2curves::bn256::Fr;
-use zkml::{
+use sysx::{
   layers::{
     arithmetic::{add::AddChip, div_var::DivVarChip, mul::MulChip, sub::SubChip},
     avg_pool_2d::AvgPool2DChip,
