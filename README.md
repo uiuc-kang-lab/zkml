@@ -1,11 +1,8 @@
-# zkml
+# sysX
 
-zkml is a framework for constructing proofs of ML model execution in ZK-SNARKs.
-Read our [blog
-post](https://medium.com/@danieldkang/trustless-verification-of-machine-learning-6f648fd8ba88)
-and [paper](https://arxiv.org/abs/2210.08674) for implementation details.
+sysX is a framework for constructing proofs of ML model execution in ZK-SNARKs.
 
-zkml requires the nightly build of Rust:
+sysX requires the nightly build of Rust:
 
 ```
 rustup override set nightly
@@ -19,8 +16,7 @@ Run the following commands:
 # Installs rust, skip if you already have rust installed
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 
-git clone https://github.com/ddkang/zkml.git
-cd zkml
+cd sysX
 rustup override set nightly
 cargo build --release
 mkdir params_kzg
@@ -38,7 +34,7 @@ around 8 seconds to run.
 
 ## Converting your own model and data
 
-To convert your own model and data, you will need to convert the model and data to the format zkml
+To convert your own model and data, you will need to convert the model and data to the format sysX
 expects. Currently, we accept TFLite models. We show an example below.
 
 1. First `cd examples/mnist`
@@ -66,7 +62,7 @@ python ../../python/input_converter.py --model_config converted_model.msgpack --
 ```
 
 6. Once you've converted the model and input, you can run the model as above! However, we generally
-   recommend testing the model before proving (you will need to build zkml before running the next
+   recommend testing the model before proving (you will need to build sysX before running the next
    line):
 ```bash
 cd ../../
@@ -76,5 +72,5 @@ cd ../../
 
 ## Contact us
 
-If you're interested in extending or using zkml, please contact us at `ddkang
+If you're interested in extending or using sysX, please contact us at `ddkang
 [at] g.illinois.edu`.
