@@ -116,10 +116,10 @@ impl<F: PrimeField> Gadget<F> for MaxChip<F> {
 
     let mut outp = vec![];
 
-    let chunks: Vec<&[&AssignedCell<F, F>]> = inp.chunks(self.num_outputs_per_row()).collect();
-    let i1 = chunks[0];
-    let i2 = chunks[1];
-    for (idx, (inp1, inp2)) in i1.iter().zip(i2.iter()).enumerate() {
+    let chunks: Vec<&[&AssignedCell<F, F>]> = inp.chunks(inp.len()/self.num_outputs_per_row()).collect();
+    for (idx, chunk) in chunks.iter().enumerate() {
+      let inp1 = chunk[0];
+      let inp2 = chunk[1];
       let offset = idx * self.num_cols_per_op();
       inp1
         .copy_advice(|| "", region, self.config.columns[offset + 0], row_offset)
